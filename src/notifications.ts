@@ -36,6 +36,21 @@ function normalizeSubject(value: string | undefined): string {
   return subject;
 }
 
+function normalizeOptionalHttpsUrl(value: string | undefined, field: string): string | undefined {
+  if (!value?.trim()) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password) throw new Error('unsafe');
+    return url.toString();
+  } catch {
+    throw new Error(`${field} must be a credential-free HTTPS URL.`);
+  }
+}
+
+function normalizeAllowedDomains(values: string[] | undefined): string[] {
+  return [...new Set((values ?? []).map((value) => value.trim().toLowerCase().replace(/^@/u, '')).filter(Boolean))];
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -98,7 +113,9 @@ function repositoryCopy(sourceRepository: string | undefined): string {
 function renderText(
   result: MemberResult,
   workspaceUrl: string,
-  sourceRepository: string | undefined
+  sourceRepository: string | undefined,
+  gettingStartedUrl: string | undefined,
+  helpUrl: string | undefined
 ): string {
   const copy = statusCopy(result);
   return [
@@ -110,6 +127,8 @@ function renderText(
     `Postman workspace role: ${result.workspaceRole}`,
     `Next step: ${copy.nextStep}`,
     `Open Postman: ${workspaceUrl}`,
+    ...(gettingStartedUrl ? [`Start here: ${gettingStartedUrl}`] : []),
+    ...(helpUrl ? [`Get help: ${helpUrl}`] : []),
     '',
     'Three useful ways to get started:',
     '- Find and reuse the APIs, collections, and environments your repository depends on.',
@@ -123,7 +142,9 @@ function renderText(
 function renderHtml(
   result: MemberResult,
   workspaceUrl: string,
-  sourceRepository: string | undefined
+  sourceRepository: string | undefined,
+  gettingStartedUrl: string | undefined,
+  helpUrl: string | undefined
 ): string {
   const copy = statusCopy(result);
   const safeUrl = escapeHtml(workspaceUrl);
@@ -139,6 +160,10 @@ function renderHtml(
     `<p><strong>Postman workspace role:</strong> ${escapeHtml(result.workspaceRole)}</p>`,
     `<p><strong>Next step:</strong> ${escapeHtml(copy.nextStep)}</p>`,
     `<p style="margin:28px 0"><a href="${safeUrl}" style="background:#ff6c37;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold">Open Postman</a></p>`,
+    ...(gettingStartedUrl
+      ? [`<p><a href="${escapeHtml(gettingStartedUrl)}">Open the Deloitte Postman getting-started guide</a></p>`]
+      : []),
+    ...(helpUrl ? [`<p><a href="${escapeHtml(helpUrl)}">Get help with access</a></p>`] : []),
     '<h3>Get value from the workspace</h3>',
     '<ul>',
     '<li>Find and reuse the APIs, collections, and environments your repository depends on.</li>',
@@ -153,13 +178,14 @@ function renderHtml(
 function notificationFor(
   result: MemberResult,
   summary: ReconcileSummary,
-  options: Required<Pick<NotificationOptions, 'workspaceUrl' | 'subject'>> & Pick<NotificationOptions, 'sourceRepository'>
+  options: Required<Pick<NotificationOptions, 'workspaceUrl' | 'subject'>>
+    & Pick<NotificationOptions, 'sourceRepository' | 'gettingStartedUrl' | 'helpUrl'>
 ): OnboardingNotification {
   return {
     to: result.email,
     subject: options.subject,
-    text: renderText(result, options.workspaceUrl, options.sourceRepository),
-    html: renderHtml(result, options.workspaceUrl, options.sourceRepository),
+    text: renderText(result, options.workspaceUrl, options.sourceRepository, options.gettingStartedUrl, options.helpUrl),
+    html: renderHtml(result, options.workspaceUrl, options.sourceRepository, options.gettingStartedUrl, options.helpUrl),
     workspaceRole: result.workspaceRole,
     lifecycle: result.lifecycle,
     workspaceAccess: result.workspaceAccess,
@@ -175,15 +201,21 @@ export function buildNotificationEnvelope(
   const workspaceUrl = normalizeWorkspaceUrl(options.workspaceUrl);
   const subject = normalizeSubject(options.subject);
   const sourceRepository = options.sourceRepository?.trim() || undefined;
+  const gettingStartedUrl = normalizeOptionalHttpsUrl(options.gettingStartedUrl, 'notification.gettingStartedUrl');
+  const helpUrl = normalizeOptionalHttpsUrl(options.helpUrl, 'notification.helpUrl');
+  const allowedDomains = normalizeAllowedDomains(options.allowedDomains);
   return {
     schemaVersion: 1,
     kind: 'deloitte-postman-onboarding',
     workspace: { id: summary.workspaceId, url: workspaceUrl },
     ...(sourceRepository ? { sourceRepository } : {}),
+    ...(allowedDomains.length > 0 ? { deliveryPolicy: { allowedDomains } } : {}),
     notifications: summary.results.map((result) => notificationFor(result, summary, {
       workspaceUrl,
       subject,
-      ...(sourceRepository ? { sourceRepository } : {})
+      ...(sourceRepository ? { sourceRepository } : {}),
+      ...(gettingStartedUrl ? { gettingStartedUrl } : {}),
+      ...(helpUrl ? { helpUrl } : {})
     }))
   };
 }
@@ -218,6 +250,8 @@ export function validateNotificationConfiguration(
 ): void {
   normalizeWorkspaceUrl(options.workspaceUrl);
   normalizeSubject(options.subject);
+  normalizeOptionalHttpsUrl(options.gettingStartedUrl, 'notification.gettingStartedUrl');
+  normalizeOptionalHttpsUrl(options.helpUrl, 'notification.helpUrl');
   if (webhookUrl?.trim()) notificationEndpoint(webhookUrl);
 }
 
@@ -242,6 +276,11 @@ export async function deliverNotificationEnvelope(
 ): Promise<number> {
   const notifications = envelope.notifications.filter((notification) => notification.send);
   if (notifications.length === 0) return 0;
+  const allowedDomains = envelope.deliveryPolicy?.allowedDomains ?? [];
+  if (allowedDomains.length > 0) {
+    const blocked = notifications.find(({ to }) => !allowedDomains.includes(to.split('@').at(-1)?.toLowerCase() ?? ''));
+    if (blocked) throw new Error(`Notification recipient ${blocked.to} is outside the configured domain allowlist.`);
+  }
   const endpoint = notificationEndpoint(options.webhookUrl);
   const token = options.token?.trim();
   const idempotencyKey = options.idempotencyKey?.trim();

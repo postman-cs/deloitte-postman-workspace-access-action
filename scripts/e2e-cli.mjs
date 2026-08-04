@@ -27,6 +27,9 @@ function runCli(baseUrl, workspaceId, members, options = {}) {
   args.push('--postman-base-url', `${baseUrl}/${options.scenario ?? workspaceId}`);
   if (options.roleMap) args.push('--role-map-json', JSON.stringify(options.roleMap));
   if (options.defaultWorkspaceRole) args.push('--default-workspace-role', options.defaultWorkspaceRole);
+  if (options.invalidMemberPolicy) args.push('--invalid-member-policy', options.invalidMemberPolicy);
+  if (options.identityMapFile) args.push('--identity-map-file', options.identityMapFile);
+  if (options.excludeBots) args.push('--exclude-bots');
   if (options.workspaceUrl) args.push('--postman-workspace-url', options.workspaceUrl);
   if (options.notificationsFile) args.push('--notifications-file', options.notificationsFile);
   if (options.dryRun) args.push('--dry-run');
@@ -233,21 +236,68 @@ try {
       'validate',
       '--members-json', JSON.stringify([{ login: 'missing-email', permission: 'read' }])
     ], { env: { POSTMAN_API_KEY: '', POSTMAN_SCIM_API_KEY: '' } });
-    assert.equal(invalidValidation.code, 1);
-    assert.match(invalidValidation.stderr, /valid email address/);
+    assert.equal(invalidValidation.code, 0, invalidValidation.stderr);
+    assert.equal(JSON.parse(invalidValidation.stdout).scanner.unresolved, 1);
+    assert.match(invalidValidation.stderr, /valid corporate email/);
 
     const invalid = await runCli(simulator.baseUrl, 'workspace-invalid', [
       { email: 'not-an-email', permission: 'read' }
-    ], { scenario: 'invalid' });
+    ], { scenario: 'invalid', invalidMemberPolicy: 'fail' });
     assert.equal(invalid.code, 1);
-    assert.match(invalid.stderr, /valid email address/);
+    assert.match(invalid.stderr, /valid corporate email/);
     assert.equal(simulator.requestsFor('invalid').length, 0);
+
+    const identityMapFile = join(directory, 'identity-map.json');
+    await writeJson(identityMapFile, { 'mapped-login': 'mapped.user@example.com' });
+    const resilient = await runCli(simulator.baseUrl, 'workspace-resilient', [
+      { login: 'mapped-login', permission: 'write' },
+      { login: 'missing-email', permission: 'read' },
+      { login: 'dependabot[bot]', type: 'Bot', permission: 'write' }
+    ], {
+      scenario: 'resilient',
+      identityMapFile,
+      excludeBots: true
+    });
+    assert.equal(resilient.code, 0, resilient.stderr);
+    const resilientSummary = JSON.parse(resilient.stdout);
+    assert.equal(resilientSummary.counts.added, 1);
+    assert.equal(resilientSummary.scanner.detected, 3);
+    assert.equal(resilientSummary.scanner.unresolved.length, 1);
+    assert.equal(resilientSummary.scanner.excluded.length, 1);
 
     const missingKey = await runProcess(process.execPath, [
       'dist/cli.cjs', '--workspace-id', 'workspace-missing-key', '--members-json', '[]'
     ], { env: { POSTMAN_API_KEY: '', POSTMAN_SCIM_API_KEY: '' } });
     assert.equal(missingKey.code, 1);
     assert.match(missingKey.stderr, /POSTMAN_API_KEY is required/);
+
+    const unconfirmedNotification = await runProcess(process.execPath, [
+      'dist/cli.cjs', 'notify-test',
+      '--email', 'sharooq@example.com',
+      '--workspace-id', 'workspace-notify-test'
+    ], {
+      env: { DELOITTE_NOTIFICATION_WEBHOOK_URL: `${simulator.baseUrl}/notification-notify-test/email-batches` }
+    });
+    assert.equal(unconfirmedNotification.code, 1);
+    assert.match(unconfirmedNotification.stderr, /SEND_TEST_NOTIFICATION/);
+    assert.equal(simulator.requestsFor('notification-notify-test').length, 0);
+
+    const notificationTest = await runProcess(process.execPath, [
+      'dist/cli.cjs', 'notify-test',
+      '--email', 'sharooq@example.com',
+      '--workspace-id', 'workspace-notify-test',
+      '--allowed-domain', 'example.com',
+      '--confirm', 'SEND_TEST_NOTIFICATION'
+    ], {
+      env: {
+        DELOITTE_NOTIFICATION_WEBHOOK_URL: `${simulator.baseUrl}/notification-notify-test/email-batches`,
+        DELOITTE_NOTIFICATION_WEBHOOK_TOKEN: NOTIFICATION_TOKEN
+      }
+    });
+    assert.equal(notificationTest.code, 0, notificationTest.stderr);
+    assert.equal(JSON.parse(notificationTest.stdout).accepted, 1);
+    assert.equal(simulator.requestsFor('notification-notify-test').length, 1);
+    assert.match(simulator.requestsFor('notification-notify-test')[0].idempotencyKey, /^deloitte-postman:test:/);
 
     const help = await runProcess(process.execPath, ['dist/cli.cjs', '--help'], {
       env: { POSTMAN_API_KEY: '', POSTMAN_SCIM_API_KEY: '' }

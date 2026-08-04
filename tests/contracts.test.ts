@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_ROLE_MAP, parseMembersJson, parseRoleMap } from '../src/contracts.js';
+import { DEFAULT_ROLE_MAP, parseMembersJson, parseMembersReport, parseRoleMap } from '../src/contracts.js';
 
 describe('scanner contract', () => {
   it('accepts GitHub collaborator permission objects', () => {
@@ -91,7 +91,40 @@ describe('scanner contract', () => {
   it('rejects unmapped scanner permissions', () => {
     expect(() => parseMembersJson(JSON.stringify([
       { email: 'dev@example.com', permission: 'unknown' }
-    ]), { ...DEFAULT_ROLE_MAP })).toThrow(/not present in role-map-json/);
+    ]), { ...DEFAULT_ROLE_MAP })).toThrow(/No explicit, mapped, or default Postman workspace role/);
+  });
+
+  it('continues valid onboarding while reporting missing identities', () => {
+    const report = parseMembersReport(JSON.stringify([
+      { login: 'valid-user', email: 'valid@example.com', permission: 'write' },
+      { login: 'mapped-user', permission: 'read' },
+      { login: 'missing-email', permission: 'read' },
+      { login: 'dependabot[bot]', type: 'Bot', permission: 'write' },
+      { login: 'service-account', email: 'service@example.com', permission: 'admin' }
+    ]), { ...DEFAULT_ROLE_MAP }, {
+      defaultWorkspaceRole: 'Viewer',
+      identityMap: { 'mapped-user': 'mapped@example.com' },
+      excludeBots: true,
+      excludeLogins: ['service-account'],
+      invalidMemberPolicy: 'continue'
+    });
+
+    expect(report.detected).toBe(5);
+    expect(report.members.map(({ email }) => email)).toEqual(['valid@example.com', 'mapped@example.com']);
+    expect(report.unresolved).toEqual([expect.objectContaining({ githubLogin: 'missing-email' })]);
+    expect(report.excluded).toHaveLength(2);
+  });
+
+  it('blocks a duplicated email when scanner records disagree on SCIM identity', () => {
+    const report = parseMembersReport(JSON.stringify([
+      { email: 'conflict@example.com', scimId: 'scim-a', permission: 'read' },
+      { email: 'CONFLICT@example.com', scimId: 'scim-b', permission: 'admin' }
+    ]), { ...DEFAULT_ROLE_MAP }, { defaultWorkspaceRole: 'Viewer' });
+
+    expect(report.members).toEqual([]);
+    expect(report.unresolved).toEqual([
+      expect.objectContaining({ identifier: 'conflict@example.com', reason: expect.stringContaining('conflicting SCIM') })
+    ]);
   });
 
   it('assigns the inclusive fallback role to otherwise unmapped collaborators', () => {

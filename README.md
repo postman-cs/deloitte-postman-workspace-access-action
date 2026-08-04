@@ -7,7 +7,8 @@ Plug-and-play workspace membership for API onboarding pipelines. Feed the action
 3. Provision or invite users who are not current team members.
 4. Assign the resolved users to the onboarded workspace.
 5. Render a Deloitte onboarding email for every detected collaborator and optionally deliver the batch through Deloitte's approved mail gateway.
-6. Return machine-readable reconciliation and notification artifacts for later pipeline steps.
+6. Keep valid contributors moving while reporting missing identities for remediation.
+7. Return machine-readable reconciliation, notification, and adoption metrics for later pipeline steps.
 
 The implementation uses the public Postman [SCIM create-user API](https://learning.postman.com/api-docs/api-reference/scim/create-scim-user) and [workspace-role API](https://learning.postman.com/api-docs/api-reference/workspaces/update-workspace-roles). Workspace role updates use SCIM IDs, so the scanner never needs to know Postman-internal user IDs.
 
@@ -16,7 +17,7 @@ For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). Sharooq's one
 ## Sharooq's golden path
 
 ```bash
-git clone --branch v0.4.0 --depth 1 \
+git clone --branch v0.5.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 ./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
@@ -32,7 +33,7 @@ cd /path/to/deloitte-pipeline
   --scanner-search-root artifacts
 ```
 
-The installed runbook contains the caller job Sharooq adds after Deloitte's onboarding and GitHub scanner jobs. Pull requests preview the access plan; pushes to `main` apply it.
+The installer also creates `.deloitte-postman.yml`, a scheduled pending-access workflow, and a Microsoft Logic Apps email adapter. The installed runbook contains the caller job Sharooq adds after Deloitte's onboarding and GitHub scanner jobs. Pull requests preview the access plan; pushes to `main` apply it.
 
 Before requesting either credential, validate the scanner artifact locally:
 
@@ -41,7 +42,9 @@ Before requesting either credential, validate the scanner artifact locally:
   --scanner-search-root artifacts
 ```
 
-Validation checks emails and permission mapping, normalizes duplicate emails, and reports SCIM-ID coverage and requested workspace roles without making a network request.
+Validation checks identities and permission mapping, normalizes duplicate emails, and reports resolved, unresolved, and excluded contributors without making a network request.
+
+Edit `.deloitte-postman.yml` once to set the scanner location, identity map, exclusions, onboarding links, and notification domains. Intentional local configuration is preserved by `upgrade`; repository variables control the scheduled pending-reconciliation workflow.
 
 ## Fastest integration
 
@@ -57,7 +60,7 @@ Validation checks emails and permission mapping, normalizes duplicate emails, an
 
 - name: Reconcile workspace access
   id: access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.4.0
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.5.0
   with:
     workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-json: ${{ steps['github-scanner'].outputs['members-json'] }}
@@ -105,9 +108,9 @@ The scanner can emit a bare array, `{ "members": [...] }`, or `{ "collaborators"
 }
 ```
 
-Required per user:
+Required per person:
 
-- `email`
+- A valid `email`, either emitted directly by the scanner or supplied through the configured login-to-email identity map.
 
 Optional fields:
 
@@ -117,6 +120,8 @@ Optional fields:
 - Snake-case versions of the fields are accepted.
 
 Duplicate emails are collapsed case-insensitively and the strongest requested role wins.
+
+By default, one malformed scanner record does not block everybody else. `invalid-member-policy: continue` processes valid contributors and exposes each unresolved identity through `unresolved-json`, `unresolved-count`, `metrics-json`, the CLI report, and workflow artifacts. Set the policy to `fail` when Deloitte wants strict all-or-nothing validation. Bot accounts and approved service logins can be excluded explicitly; they remain counted and auditable.
 
 ## Default role mapping
 
@@ -161,6 +166,8 @@ Postman's native email behavior differs by lifecycle, so this action also render
 - Configured gateway rejection fails the action; transient responses are retried with an idempotency key.
 
 See [the notification gateway contract](docs/NOTIFICATIONS.md) and [the human-readable email template](templates/deloitte-postman-onboarding-email.md). The action confirms gateway acceptance, not downstream mailbox delivery; Deloitte's gateway remains responsible for domain policy, final sending, and delivery telemetry.
+
+The starter kit includes a Microsoft Logic Apps definition for Office 365 delivery. Before enabling it, Deloitte binds its approved shared-mailbox connection, protects the HTTP trigger, and sets `notification.allowedDomains` in `.deloitte-postman.yml`. A guarded `notify-test` command requires an explicit confirmation token and sends to exactly one address.
 
 ## Generic CI / CLI
 
@@ -216,14 +223,22 @@ See [Postman prerequisites](docs/POSTMAN-PREREQUISITES.md) for the plan, service
 - `pending-count` — Invited users who must accept before workspace access can be assigned.
 - `skipped-count` — Planned operations in dry-run mode.
 - `failed-count` — Entries that failed.
+- `detected-count` — Raw scanner contributor records.
+- `resolved-count` — Unique contributors eligible for onboarding.
+- `unresolved-count` / `unresolved-json` — Records needing identity or role remediation.
+- `excluded-count` — Intentionally excluded bot or service records.
 - `scanner-source` — The exact scanner input selected by discovery.
+- `config-source` — The configuration file selected by the action.
 - `summary-file` — The JSON report path when `summary-file` is configured.
 - `notification-count` — Messages rendered for detected collaborators.
 - `notification-eligible-count` — Messages eligible for delivery; previews are excluded.
 - `notification-delivered-count` — Messages accepted by the configured Deloitte gateway.
 - `notifications-file` — The rendered plain-text and HTML email batch.
+- `metrics-json` — Scanner resolution, workspace access, and notification adoption counts.
 
 The reusable workflow always uploads the JSON report as a retained GitHub Actions artifact. Its job summary shows outcome counts and a per-user remediation table.
+
+The optional scheduled workflow reuses the latest successful scanner artifact to complete workspace role assignment after users accept invitations. It intentionally omits the notification gateway so recipients are not repeatedly emailed.
 
 ## Protected live smoke test
 

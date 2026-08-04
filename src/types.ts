@@ -22,6 +22,30 @@ export interface ScannerMember {
   workspaceRole?: unknown;
   workspace_role?: unknown;
   permissions?: unknown;
+  type?: unknown;
+}
+
+export interface ScannerIssue {
+  index: number;
+  identifier: string;
+  githubLogin?: string;
+  email?: string;
+  reason: string;
+}
+
+export interface ExcludedScannerMember {
+  index: number;
+  identifier: string;
+  githubLogin?: string;
+  email?: string;
+  reason: string;
+}
+
+export interface ScannerResolution {
+  detected: number;
+  members: NormalizedMember[];
+  unresolved: ScannerIssue[];
+  excluded: ExcludedScannerMember[];
 }
 
 export interface NormalizedMember {
@@ -115,6 +139,9 @@ export interface NotificationEnvelope {
     url: string;
   };
   sourceRepository?: string;
+  deliveryPolicy?: {
+    allowedDomains: string[];
+  };
   notifications: OnboardingNotification[];
 }
 
@@ -122,6 +149,9 @@ export interface NotificationOptions {
   workspaceUrl?: string;
   sourceRepository?: string;
   subject?: string;
+  gettingStartedUrl?: string;
+  helpUrl?: string;
+  allowedDomains?: string[];
 }
 
 export interface DoctorReport {
@@ -143,9 +173,12 @@ export interface ValidationReport {
   ok: true;
   scanner: {
     source: string;
+    detected: number;
     uniqueMembers: number;
     withScimId: number;
     requiringScimLookup: number;
+    unresolved: number;
+    excluded: number;
   };
   workspaceRoles: Record<string, number>;
   members: Array<{
@@ -155,6 +188,8 @@ export interface ValidationReport {
     githubLogin?: string;
     hasScimId: boolean;
   }>;
+  unresolved: ScannerIssue[];
+  excluded: ExcludedScannerMember[];
 }
 
 export interface ReconcileOptions {

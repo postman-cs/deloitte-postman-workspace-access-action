@@ -1,4 +1,14 @@
-import type { NormalizedMember, ScannerMember } from './types.js';
+import type { NormalizedMember, ScannerMember, ScannerResolution } from './types.js';
+
+export type InvalidMemberPolicy = 'continue' | 'fail';
+
+export interface MemberParsingOptions {
+  defaultWorkspaceRole?: string;
+  identityMap?: Readonly<Record<string, string>>;
+  excludeBots?: boolean;
+  excludeLogins?: ReadonlyArray<string>;
+  invalidMemberPolicy?: InvalidMemberPolicy;
+}
 
 export const DEFAULT_ROLE_MAP: Readonly<Record<string, string>> = {
   admin: 'Admin',
@@ -113,11 +123,11 @@ function unwrapMembers(value: unknown): unknown[] {
   throw new Error('Members input must be an array or an object with a members/collaborators array.');
 }
 
-export function parseMembersJson(
+export function parseMembersReport(
   value: string,
   roleMap: Record<string, string>,
-  defaultWorkspaceRole?: string
-): NormalizedMember[] {
+  options: MemberParsingOptions = {}
+): ScannerResolution {
   let parsed: unknown;
   try {
     parsed = JSON.parse(value);
@@ -125,15 +135,57 @@ export function parseMembersJson(
     throw new Error(`Members input must be valid JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
 
+  const rawMembers = unwrapMembers(parsed);
   const deduplicated = new Map<string, NormalizedMember>();
-  for (const [index, raw] of unwrapMembers(parsed).entries()) {
+  const blockedEmails = new Set<string>();
+  const unresolved: ScannerResolution['unresolved'] = [];
+  const excluded: ScannerResolution['excluded'] = [];
+  const excludedLogins = new Set((options.excludeLogins ?? []).map((login) => login.trim().toLowerCase()).filter(Boolean));
+  const identityMap = new Map(Object.entries(options.identityMap ?? {}).map(([login, email]) => [
+    login.trim().toLowerCase(),
+    String(email).trim().toLowerCase()
+  ]));
+  for (const [index, raw] of rawMembers.entries()) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      throw new Error(`Member at index ${index} must be a JSON object.`);
+      unresolved.push({ index, identifier: `member[${index}]`, reason: 'Scanner entry must be a JSON object.' });
+      continue;
     }
     const member = raw as ScannerMember;
-    const email = firstString(member.email)?.toLowerCase();
+    const githubLogin = optionalString(member.login);
+    const suppliedEmail = firstString(member.email)?.toLowerCase();
+    const mappedEmail = githubLogin ? identityMap.get(githubLogin.toLowerCase()) : undefined;
+    const email = suppliedEmail ?? mappedEmail;
+    const identifier = email ?? (githubLogin ? `@${githubLogin}` : `member[${index}]`);
+    const bot = optionalString(member.type)?.toLowerCase() === 'bot' || githubLogin?.toLowerCase().endsWith('[bot]');
+    if ((options.excludeBots && bot) || (githubLogin && excludedLogins.has(githubLogin.toLowerCase()))) {
+      excluded.push({
+        index,
+        identifier,
+        ...(githubLogin ? { githubLogin } : {}),
+        ...(email ? { email } : {}),
+        reason: bot ? 'Excluded bot account.' : 'Login is listed in excludeLogins.'
+      });
+      continue;
+    }
     if (!email || !isEmail(email)) {
-      throw new Error(`Member at index ${index} must include a valid email address.`);
+      unresolved.push({
+        index,
+        identifier,
+        ...(githubLogin ? { githubLogin } : {}),
+        ...(suppliedEmail ? { email: suppliedEmail } : {}),
+        reason: 'A valid corporate email is required; add it to the scanner output or identity map.'
+      });
+      continue;
+    }
+    if (blockedEmails.has(email)) {
+      unresolved.push({
+        index,
+        identifier: email,
+        ...(githubLogin ? { githubLogin } : {}),
+        email,
+        reason: 'Duplicate scanner records contain conflicting SCIM IDs.'
+      });
+      continue;
     }
 
     const explicitRole = firstString(
@@ -144,15 +196,19 @@ export function parseMembersJson(
     );
     const candidates = permissionCandidates(member);
     const permission = candidates.find((candidate) => roleMap[candidate]);
-    const fallbackRole = optionalString(defaultWorkspaceRole);
+    const fallbackRole = optionalString(options.defaultWorkspaceRole);
     const workspaceRole = explicitRole ?? (permission ? roleMap[permission] : undefined) ?? fallbackRole;
     if (!workspaceRole) {
-      throw new Error(
-        `Member ${email} has no Postman workspace role and its GitHub permission is not present in role-map-json.`
-      );
+      unresolved.push({
+        index,
+        identifier: email,
+        ...(githubLogin ? { githubLogin } : {}),
+        email,
+        reason: 'No explicit, mapped, or default Postman workspace role is available.'
+      });
+      continue;
     }
 
-    const githubLogin = optionalString(member.login);
     const scimId = firstString(member.scimId, member.scim_id);
     const externalId = firstString(member.externalId, member.external_id, member.login);
     const givenName = firstString(member.givenName, member.given_name);
@@ -172,7 +228,16 @@ export function parseMembersJson(
 
     const previous = deduplicated.get(email);
     if (previous?.scimId && normalized.scimId && previous.scimId !== normalized.scimId) {
-      throw new Error(`Duplicate member ${email} has conflicting SCIM IDs.`);
+      deduplicated.delete(email);
+      blockedEmails.add(email);
+      unresolved.push({
+        index,
+        identifier: email,
+        ...(githubLogin ? { githubLogin } : {}),
+        email,
+        reason: 'Duplicate scanner records contain conflicting SCIM IDs.'
+      });
+      continue;
     }
     if (!previous) {
       deduplicated.set(email, normalized);
@@ -188,7 +253,29 @@ export function parseMembersJson(
       ...(previous.scimId || normalized.scimId ? { scimId: previous.scimId ?? normalized.scimId } : {})
     });
   }
-  return [...deduplicated.values()];
+  if (options.invalidMemberPolicy === 'fail' && unresolved.length > 0) {
+    const first = unresolved[0];
+    throw new Error(
+      `${unresolved.length} scanner member(s) could not be resolved. ${first?.identifier ?? 'First entry'}: ${first?.reason ?? 'Unknown error'}`
+    );
+  }
+  return {
+    detected: rawMembers.length,
+    members: [...deduplicated.values()],
+    unresolved,
+    excluded
+  };
+}
+
+export function parseMembersJson(
+  value: string,
+  roleMap: Record<string, string>,
+  defaultWorkspaceRole?: string
+): NormalizedMember[] {
+  return parseMembersReport(value, roleMap, {
+    ...(defaultWorkspaceRole ? { defaultWorkspaceRole } : {}),
+    invalidMemberPolicy: 'fail'
+  }).members;
 }
 
 export function parseBoolean(value: string | undefined, fallback = false): boolean {

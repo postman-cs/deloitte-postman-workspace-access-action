@@ -11,7 +11,9 @@ Add these GitHub Actions secrets to the Deloitte pipeline repository:
 - `DELOITTE_NOTIFICATION_WEBHOOK_URL` (optional until Deloitte's mail gateway is ready)
 - `DELOITTE_NOTIFICATION_WEBHOOK_TOKEN` (optional bearer credential)
 
-The installer creates a local action, a reusable workflow, a notification template, and a doctor command. Do not store credentials in a repository variable, scanner artifact, or log.
+The installer creates a local action, reusable and scheduled workflows, a central `.deloitte-postman.yml`, a notification template/adapter, and a doctor command. Do not store credentials in a repository variable, scanner artifact, or log.
+
+Edit `.deloitte-postman.yml` to match Deloitte's scanner and onboarding links. The installer preserves this file during upgrades. Use `scanner.identityMapFile` for a JSON object or `login,email` CSV when GitHub records do not include corporate email. Keep `scanner.invalidMemberPolicy: continue` to onboard valid people while reporting exceptions; use `fail` only for an all-or-nothing gate.
 
 Before credentials are available, validate the scanner artifact without network access:
 
@@ -64,7 +66,7 @@ If the scanner uploads an artifact, add this job after the existing onboarding a
 
 This gives Sharooq a read-only preview on pull requests and applies the same plan after merge to `main`.
 
-Each run adds a per-user remediation table to the job summary and uploads the reconciliation and rendered-email JSON as a retained Actions artifact. Apply runs send the batch when `DELOITTE_NOTIFICATION_WEBHOOK_URL` is configured; previews render messages with `send: false` but never call the gateway.
+Each run adds a per-user remediation table to the job summary and uploads the reconciliation and rendered-email JSON as a retained Actions artifact. The `unresolved-count`, `unresolved-json`, and `metrics-json` outputs show scanner identity gaps without hiding successful onboarding. Apply runs send the batch when `DELOITTE_NOTIFICATION_WEBHOOK_URL` is configured; previews render messages with `send: false` but never call the gateway.
 
 If the scanner writes its JSON into the checked-out workspace instead of an artifact, omit `scanner-artifact`. The action will find the file automatically.
 
@@ -76,6 +78,12 @@ The GitHub job summary lists every user and one of these outcomes:
 - `would-add`: preview only; no write occurred.
 - `pending`: Postman invited the user, but workspace access must wait for acceptance.
 - `failed`: the entry needs intervention.
+
+Scanner resolution is reported separately:
+
+- `resolved`: a corporate email was present or found in the identity map.
+- `unresolved`: a login needs an identity-map/email fix; other valid people still proceed by default.
+- `excluded`: a configured bot or service login was deliberately omitted.
 
 Lifecycle values explain what happened to the team user:
 
@@ -97,12 +105,21 @@ Lifecycle values explain what happened to the team user:
 | Invitation is pending | Ask the user to accept the Postman team invite, then rerun the same job. |
 | One user fails after a batch retry | Use that user's error in the job summary; successful users have already been handled idempotently. |
 | Notification gateway rejects the batch | Review the gateway policy and `.deloitte-postman/notifications.json`; the action fails instead of silently dropping email. |
+| Contributor appears under `unresolved` | Add the corporate email to scanner output or to the configured login-to-email identity map, then rerun. |
 
 ## Notification operations
 
 The email transport is deliberately owned by Deloitte. The action sends a vendor-neutral JSON batch containing the recipient, subject, plain text, escaped HTML, workspace role, and lifecycle status. The gateway must return `2xx` only after accepting the whole batch.
 
 Use `notification-delivered-count` to confirm gateway acceptance and the mail gateway's own telemetry to confirm final mailbox delivery. The installed `docs/deloitte-postman-notifications.md` contains the complete contract and `docs/deloitte-postman-onboarding-email.md` contains the message template.
+
+For an Office 365 implementation, import `docs/deloitte-postman-logic-app/deloitte-postman-notifier.workflow.json`, bind Deloitte's approved shared-mailbox connection, and protect the HTTP trigger. Restrict recipients with `notification.allowedDomains` in `.deloitte-postman.yml`. Test one approved mailbox only with the installed CLI's `notify-test` command and its mandatory `SEND_TEST_NOTIFICATION` confirmation.
+
+## Complete pending invitations automatically
+
+Set repository variables `POSTMAN_WORKSPACE_ID` and `DELOITTE_PENDING_RECONCILIATION_ENABLED=true`, then review `.github/workflows/deloitte-postman-pending-reconcile.yml`. It downloads the latest successful scanner artifact and retries idempotent role assignment after invite acceptance. Until that enable flag is set, scheduled runs are safely skipped and manual dispatch remains available. The scheduled path does not call the notification gateway, preventing repeat onboarding email.
+
+The scanner workflow/artifact defaults are `github-scanner.yml` and `github-scanner-output`; override them with repository variables `DELOITTE_SCANNER_WORKFLOW` and `DELOITTE_SCANNER_ARTIFACT`.
 
 ## Upgrade
 

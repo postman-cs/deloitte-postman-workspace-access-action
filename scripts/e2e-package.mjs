@@ -39,6 +39,8 @@ try {
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/schemas/deloitte-github-scanner-output.schema.json'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/scripts/deloitte-init.sh'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/templates/deloitte-postman-workspace-access.yml'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/templates/deloitte-postman-pending-reconcile.yml'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/templates/logic-app/deloitte-postman-notifier.workflow.json'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/templates/deloitte-postman-onboarding-email.md'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/docs/SHAROOQ-RUNBOOK.md'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/docs/POSTMAN-PREREQUISITES.md'));
@@ -55,6 +57,8 @@ try {
     assert.equal(packagedInstall.code, 0, packagedInstall.stderr);
     await readFile(join(packagedConsumer, '.github/actions/deloitte-postman-workspace-access/dist/index.cjs'));
     await readFile(join(packagedConsumer, '.github/workflows/deloitte-postman-workspace-access.yml'));
+    await readFile(join(packagedConsumer, '.github/workflows/deloitte-postman-pending-reconcile.yml'));
+    await readFile(join(packagedConsumer, '.deloitte-postman.yml'));
 
     const binary = join(packageRoot, 'node_modules/.bin/postman-workspace-access');
     const result = await runProcess(binary, [

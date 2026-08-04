@@ -13,9 +13,19 @@ on:
         default: ''
         type: string
       scanner-search-root:
-        description: Directory containing the scanner output, or the destination for scanner-artifact.
+        description: Optional directory containing scanner output when no artifact is downloaded. The config file is used when empty.
         required: false
-        default: .
+        default: ''
+        type: string
+      config-file:
+        description: Central Deloitte onboarding configuration file.
+        required: false
+        default: .deloitte-postman.yml
+        type: string
+      identity-map-file:
+        description: Optional JSON or login,email CSV mapping for scanner logins without email.
+        required: false
+        default: ''
         type: string
       apply:
         description: Apply changes. False performs a read-only preview.
@@ -30,17 +40,17 @@ on:
       default-workspace-role:
         description: Fallback Postman role for any detected collaborator without a mapped permission.
         required: false
-        default: Viewer
+        default: ''
         type: string
       postman-workspace-url:
         description: User-facing URL placed in Deloitte onboarding emails.
         required: false
-        default: https://go.postman.co/
+        default: ''
         type: string
       notification-subject:
         description: Subject line used by Deloitte's mail gateway.
         required: false
-        default: 'Deloitte: Your Postman workspace access'
+        default: ''
         type: string
       artifact-retention-days:
         description: Number of days to retain the machine-readable reconciliation summary.
@@ -66,6 +76,12 @@ on:
       failed-count:
         description: Failed reconciliation entries.
         value: ${{ jobs.reconcile.outputs['failed-count'] }}
+      unresolved-count:
+        description: Scanner records requiring identity remediation.
+        value: ${{ jobs.reconcile.outputs['unresolved-count'] }}
+      metrics-json:
+        description: Scanner, access, and notification adoption metrics.
+        value: ${{ jobs.reconcile.outputs['metrics-json'] }}
       summary-artifact:
         description: Name of the uploaded reconciliation-summary artifact.
         value: ${{ jobs.reconcile.outputs['summary-artifact'] }}
@@ -90,6 +106,8 @@ jobs:
       summary-artifact: ${{ steps.artifact_name.outputs.name }}
       notification-count: ${{ steps.access.outputs['notification-count'] }}
       notification-delivered-count: ${{ steps.access.outputs['notification-delivered-count'] }}
+      unresolved-count: ${{ steps.access.outputs['unresolved-count'] }}
+      metrics-json: ${{ steps.access.outputs['metrics-json'] }}
     steps:
       - name: Check out pipeline repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -99,14 +117,16 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ inputs['scanner-artifact'] }}
-          path: ${{ inputs['scanner-search-root'] }}
+          path: .deloitte-postman/scanner
 
       - name: Reconcile Deloitte workspace access
         id: access
         uses: ./.github/actions/deloitte-postman-workspace-access
         with:
           workspace-id: ${{ inputs['workspace-id'] }}
-          scanner-search-root: ${{ inputs['scanner-search-root'] }}
+          config-file: ${{ inputs['config-file'] }}
+          scanner-search-root: ${{ inputs['scanner-artifact'] != '' && '.deloitte-postman/scanner' || inputs['scanner-search-root'] }}
+          identity-map-file: ${{ inputs['identity-map-file'] }}
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
           postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
           default-workspace-role: ${{ inputs['default-workspace-role'] }}

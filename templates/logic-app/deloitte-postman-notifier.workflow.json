@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "Deloitte_Postman_notification_batch": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "schema": {
+          "type": "object",
+          "required": ["schemaVersion", "kind", "notifications"],
+          "properties": {
+            "schemaVersion": { "type": "integer", "enum": [1] },
+            "kind": { "type": "string", "enum": ["deloitte-postman-onboarding"] },
+            "notifications": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["to", "subject", "html", "send"],
+                "properties": {
+                  "to": { "type": "string" },
+                  "subject": { "type": "string" },
+                  "html": { "type": "string" },
+                  "send": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "For_each_notification": {
+      "type": "Foreach",
+      "foreach": "@triggerBody()?['notifications']",
+      "actions": {
+        "Send_an_email_V2": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['office365']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/v2/Mail",
+            "body": {
+              "To": "@items('For_each_notification')?['to']",
+              "Subject": "@items('For_each_notification')?['subject']",
+              "Body": "@items('For_each_notification')?['html']",
+              "Importance": "Normal"
+            }
+          }
+        }
+      },
+      "runAfter": {}
+    },
+    "Accepted": {
+      "type": "Response",
+      "kind": "Http",
+      "inputs": {
+        "statusCode": 202,
+        "body": {
+          "accepted": "@length(triggerBody()?['notifications'])"
+        }
+      },
+      "runAfter": {
+        "For_each_notification": ["Succeeded"]
+      }
+    }
+  },
+  "outputs": {}
+}

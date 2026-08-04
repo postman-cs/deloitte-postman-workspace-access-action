@@ -13,6 +13,8 @@ When the URL is configured, a non-preview run sends one `POST` request. A non-2x
 
 No webhook is called during `dry-run`. The notification JSON is still rendered for review.
 
+The starter kit includes `docs/deloitte-postman-logic-app/` as an Office 365 adapter. Deloitte must bind its tenant connection, protect the request trigger, and approve the shared mailbox before production use.
+
 ## Webhook contract
 
 Request headers:
@@ -34,6 +36,9 @@ Request body:
     "url": "https://go.postman.co/workspace/example"
   },
   "sourceRepository": "deloitte/example-api",
+  "deliveryPolicy": {
+    "allowedDomains": ["deloitte.com"]
+  },
   "notifications": [
     {
       "to": "contributor@example.com",
@@ -52,6 +57,8 @@ Request body:
 
 The gateway should validate the recipient against Deloitte's allowed domains, deduplicate on `Idempotency-Key`, send `text` and `html` as the alternative email bodies, and return any `2xx` response only after accepting the complete batch.
 
+The action also enforces `notification.allowedDomains` before sending the batch. Leave the list empty only during controlled setup; production configuration should list Deloitte-approved recipient domains.
+
 ## GitHub Actions setup
 
 Add the two notification secrets next to the existing Postman secrets. Pass the exact workspace URL so the email CTA opens the onboarded workspace:
@@ -65,3 +72,17 @@ secrets: inherit
 The reusable workflow writes `.deloitte-postman/notifications.json` and uploads it with the reconciliation summary. The artifact contains email addresses and must use the repository's approved retention and access policy.
 
 The source repository ships the human-readable reference at `templates/deloitte-postman-onboarding-email.md`; the installer places it beside this guide as `docs/deloitte-postman-onboarding-email.md`. The runtime renderer escapes user-controlled fields before producing HTML.
+
+## Guarded one-recipient test
+
+The installed CLI refuses a notification test unless the operator supplies the exact confirmation token:
+
+```bash
+./.github/actions/deloitte-postman-workspace-access/dist/cli.cjs notify-test \
+  --email approved.user@deloitte.com \
+  --workspace-id "${POSTMAN_WORKSPACE_ID}" \
+  --allowed-domain deloitte.com \
+  --confirm SEND_TEST_NOTIFICATION
+```
+
+Use the mail gateway's telemetry to confirm mailbox delivery; a successful command confirms only that the gateway accepted the request.
