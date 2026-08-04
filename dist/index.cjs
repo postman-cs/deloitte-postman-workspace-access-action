@@ -19364,13 +19364,46 @@ function firstString(...values) {
   }
   return void 0;
 }
-function permissionFromObject(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+var GITHUB_PERMISSION_PRECEDENCE = [
+  "admin",
+  "maintain",
+  "write",
+  "push",
+  "triage",
+  "read",
+  "pull"
+];
+function permissionsFromObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
   const permissions = value;
-  for (const key of ["admin", "maintain", "push", "write", "triage", "pull", "read"]) {
-    if (permissions[key] === true) return key;
+  const enabled = new Set(Object.entries(permissions).flatMap(([key, allowed]) => {
+    const normalized = key.trim().toLowerCase();
+    return allowed === true && normalized ? [normalized] : [];
+  }));
+  return [
+    ...GITHUB_PERMISSION_PRECEDENCE.filter((permission) => enabled.delete(permission)),
+    ...[...enabled].sort()
+  ];
+}
+function permissionCandidates(member) {
+  const result = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const value of [
+    member.githubPermission,
+    member.github_permission,
+    member.permission,
+    member.roleName,
+    member.role_name,
+    member.role,
+    ...permissionsFromObject(member.permissions)
+  ]) {
+    const permission = optionalString(value)?.toLowerCase();
+    if (permission && !seen.has(permission)) {
+      result.push(permission);
+      seen.add(permission);
+    }
   }
-  return void 0;
+  return result;
 }
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -19393,7 +19426,7 @@ function parseRoleMap(value) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("role-map-json must be a JSON object.");
   }
-  const result = {};
+  const result = { ...DEFAULT_ROLE_MAP };
   for (const [key, target] of Object.entries(parsed)) {
     const normalizedKey = key.trim().toLowerCase();
     const normalizedTarget = optionalString(target);
@@ -19436,15 +19469,8 @@ function parseMembersJson(value, roleMap) {
       member.workspaceRole,
       member.workspace_role
     );
-    const permission = firstString(
-      member.githubPermission,
-      member.github_permission,
-      member.permission,
-      member.roleName,
-      member.role_name,
-      member.role,
-      permissionFromObject(member.permissions)
-    )?.toLowerCase();
+    const candidates = permissionCandidates(member);
+    const permission = candidates.find((candidate) => roleMap[candidate]);
     const workspaceRole = explicitRole ?? (permission ? roleMap[permission] : void 0);
     if (!workspaceRole) {
       throw new Error(

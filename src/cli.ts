@@ -20,7 +20,7 @@ Options:
   --members-file <path>             Scanner output JSON file.
   --members-json <json>             Inline scanner output JSON.
   --scanner-search-root <path>      Root used to auto-discover scanner output; defaults to current directory.
-  --role-map-json <json>            GitHub permission to Postman role map.
+  --role-map-json <json>            Overrides/extensions for the default GitHub-to-Postman role map.
   --postman-base-url <url>          Defaults to https://api.postman.com.
   --dry-run                         Plan without writes.
   --fail-on-pending-invites         Exit non-zero while invitations are pending.

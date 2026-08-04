@@ -48,7 +48,13 @@ try {
         { email: 'new.viewer@example.com', role_name: 'read', login: 'new-viewer' },
         { email: 'provided.viewer@example.com', scim_id: 'scim-provided-viewer', workspace_role: 'Viewer' },
         { email: 'race.user@example.com', permission: 'write' },
-        { email: 'custom.role@example.com', scimId: 'scim-custom-role', permission: 'contribute' }
+        { email: 'custom.role@example.com', scimId: 'scim-custom-role', permission: 'contribute' },
+        {
+          email: 'custom.fallback@example.com',
+          scimId: 'scim-custom-fallback',
+          role_name: 'api-contributor',
+          permissions: { push: true, pull: true }
+        }
       ]
     };
     const membersFile = join(directory, 'scanner-output.json');
@@ -62,7 +68,7 @@ try {
     assertSecretsMasked(success);
     const successSummary = JSON.parse(success.stdout);
     assert.deepEqual(successSummary.counts, {
-      added: 6,
+      added: 7,
       invited: 1,
       pending: 0,
       skipped: 0,
@@ -73,6 +79,7 @@ try {
     assert.equal(successSummary.results.find((item) => item.email === 'new.viewer@example.com').lifecycle, 'provisioned');
     assert.equal(successSummary.results.find((item) => item.email === 'race.user@example.com').lifecycle, 'existing');
     assert.equal(successSummary.results.find((item) => item.email === 'provided.viewer@example.com').lifecycle, 'provided-scim-id');
+    assert.equal(successSummary.results.find((item) => item.email === 'custom.fallback@example.com').workspaceRole, 'Editor');
 
     const successRequests = simulator.requestsFor('success');
     assert.equal(successRequests.filter((request) => request.method === 'POST').length, 2);
@@ -85,7 +92,8 @@ try {
       { id: 'scim-new-viewer', role: '1' },
       { id: 'scim-provided-viewer', role: '1' },
       { id: 'scim-race-user', role: '2' },
-      { id: 'scim-custom-role', role: '2' }
+      { id: 'scim-custom-role', role: '2' },
+      { id: 'scim-custom-fallback', role: '2' }
     ]);
 
     const dryRunMembers = { members: [

@@ -62,7 +62,7 @@ The smallest accepted payload is:
 }
 ```
 
-The action also accepts GitHub's native `permissions` object, known `scimId` values, and explicit `workspaceRole` values. See `examples/deloitte-scanner-output.json` for the full shape.
+The action also accepts GitHub's native `permissions` object, known `scimId` values, and explicit `workspaceRole` values. Custom GitHub `role_name` values fall back to their highest mapped base permission, so collaborators aren't dropped merely because Deloitte uses custom repository roles. See `examples/deloitte-scanner-output.json` for the full shape.
 
 Name an artifact file `deloitte-github-scanner-output.json`, `github-scanner-output.json`, or `scanner-output.json` and the installed workflow will find it recursively. Multiple matches fail with an explicit error.
 

@@ -23,6 +23,19 @@
       "email": "api.reviewer@example.com",
       "permission": "read",
       "externalId": "github-1003"
+    },
+    {
+      "login": "api-contributor",
+      "email": "api.contributor@example.com",
+      "role_name": "deloitte-api-contributor",
+      "permissions": {
+        "admin": false,
+        "maintain": false,
+        "push": true,
+        "triage": true,
+        "pull": true
+      },
+      "externalId": "github-1004"
     }
   ]
 }

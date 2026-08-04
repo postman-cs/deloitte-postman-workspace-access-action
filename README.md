@@ -123,7 +123,9 @@ Duplicate emails are collapsed case-insensitively and the strongest requested ro
 | `maintain`, `write`, `push` | Editor |
 | `triage`, `read`, `pull` | Viewer |
 
-Override it with `role-map-json`:
+GitHub custom repository roles are supported without dropping collaborators. If `role_name` has an explicit entry in `role-map-json`, that mapping wins. Otherwise the action examines every `true` value in GitHub's native `permissions` object and uses the highest mapped base permission. Postman receives one effective workspace role per user, as required by the workspace-role API.
+
+Extend or override individual mappings with `role-map-json`; omitted standard permissions keep their defaults:
 
 ```yaml
 role-map-json: '{"admin":"Admin","write":"Editor","read":"Viewer"}'

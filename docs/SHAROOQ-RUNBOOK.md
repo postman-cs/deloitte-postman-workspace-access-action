@@ -87,7 +87,7 @@ Lifecycle values explain what happened to the team user:
 | --- | --- |
 | No scanner output found | Confirm the scanner artifact was downloaded or rename its JSON to one of the recognized filenames. |
 | Multiple scanner outputs found | Remove stale artifacts or pass one exact `members-file` path in a direct action step. |
-| Unknown GitHub permission | Add the permission to `role-map-json`, or have the scanner emit `workspaceRole`. |
+| Unknown GitHub permission | Include GitHub's native `permissions` object so the action can use the highest mapped base permission; otherwise add the custom role to `role-map-json` or emit `workspaceRole`. |
 | Workspace role is unavailable | Confirm the Postman workspace exposes `Admin`, `Editor`, and `Viewer`, or update the role map. |
 | `401` or `403` from Postman | Rotate the affected secret and confirm it belongs to an account authorized for the workspace/team. |
 | Invitation is pending | Ask the user to accept the Postman team invite, then rerun the same job. |

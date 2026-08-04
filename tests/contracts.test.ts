@@ -19,6 +19,51 @@ describe('scanner contract', () => {
     })]);
   });
 
+  it('maps every supported GitHub repository role', () => {
+    const members = parseMembersJson(JSON.stringify({ collaborators: [
+      { email: 'admin@example.com', role_name: 'admin' },
+      { email: 'maintain@example.com', role_name: 'maintain' },
+      { email: 'write@example.com', role_name: 'write' },
+      { email: 'triage@example.com', role_name: 'triage' },
+      { email: 'read@example.com', role_name: 'read' }
+    ] }), { ...DEFAULT_ROLE_MAP });
+
+    expect(members.map(({ email, workspaceRole }) => ({ email, workspaceRole }))).toEqual([
+      { email: 'admin@example.com', workspaceRole: 'Admin' },
+      { email: 'maintain@example.com', workspaceRole: 'Editor' },
+      { email: 'write@example.com', workspaceRole: 'Editor' },
+      { email: 'triage@example.com', workspaceRole: 'Viewer' },
+      { email: 'read@example.com', workspaceRole: 'Viewer' }
+    ]);
+  });
+
+  it('falls back from an unmapped custom role to its highest mapped base permission', () => {
+    const members = parseMembersJson(JSON.stringify([{
+      email: 'custom@example.com',
+      role_name: 'api-contributor',
+      permissions: { pull: true, triage: true, push: true, admin: false }
+    }]), { ...DEFAULT_ROLE_MAP });
+
+    expect(members[0]).toMatchObject({
+      email: 'custom@example.com',
+      githubPermission: 'push',
+      workspaceRole: 'Editor'
+    });
+  });
+
+  it('prefers an explicit custom-role mapping over base-permission fallback', () => {
+    const members = parseMembersJson(JSON.stringify([{
+      email: 'custom-admin@example.com',
+      role_name: 'api-owner',
+      permissions: { push: true, pull: true }
+    }]), { ...DEFAULT_ROLE_MAP, 'api-owner': 'Admin' });
+
+    expect(members[0]).toMatchObject({
+      githubPermission: 'api-owner',
+      workspaceRole: 'Admin'
+    });
+  });
+
   it('supports snake_case scanner fields and explicit workspace roles', () => {
     const members = parseMembersJson(JSON.stringify([{
       email: 'viewer@example.com',
@@ -50,7 +95,11 @@ describe('scanner contract', () => {
   });
 
   it('validates role map JSON', () => {
-    expect(parseRoleMap('{"owner":"Admin"}')).toEqual({ owner: 'Admin' });
+    expect(parseRoleMap('{"owner":"Admin","read":"Editor"}')).toEqual({
+      ...DEFAULT_ROLE_MAP,
+      owner: 'Admin',
+      read: 'Editor'
+    });
     expect(() => parseRoleMap('[]')).toThrow(/JSON object/);
   });
 });
