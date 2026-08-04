@@ -2095,9 +2095,9 @@ var require_dispatcher_base = __commonJS({
       }
       close(callback) {
         if (callback === void 0) {
-          return new Promise((resolve, reject) => {
+          return new Promise((resolve2, reject) => {
             this.close((err, data) => {
-              return err ? reject(err) : resolve(data);
+              return err ? reject(err) : resolve2(data);
             });
           });
         }
@@ -2135,12 +2135,12 @@ var require_dispatcher_base = __commonJS({
           err = null;
         }
         if (callback === void 0) {
-          return new Promise((resolve, reject) => {
+          return new Promise((resolve2, reject) => {
             this.destroy(err, (err2, data) => {
               return err2 ? (
                 /* istanbul ignore next: should never error */
                 reject(err2)
-              ) : resolve(data);
+              ) : resolve2(data);
             });
           });
         }
@@ -4407,8 +4407,8 @@ var require_util2 = __commonJS({
     function createDeferredPromise() {
       let res;
       let rej;
-      const promise = new Promise((resolve, reject) => {
-        res = resolve;
+      const promise = new Promise((resolve2, reject) => {
+        res = resolve2;
         rej = reject;
       });
       return { promise, resolve: res, reject: rej };
@@ -6654,12 +6654,12 @@ upgrade: ${upgrade}\r
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve, reject) => {
+      const waitForDrain = () => new Promise((resolve2, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve;
+          callback = resolve2;
         }
       });
       socket.on("close", onDrain).on("drain", onDrain);
@@ -7296,12 +7296,12 @@ var require_client_h2 = __commonJS({
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve, reject) => {
+      const waitForDrain = () => new Promise((resolve2, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve;
+          callback = resolve2;
         }
       });
       h2stream.on("close", onDrain).on("drain", onDrain);
@@ -7779,16 +7779,16 @@ var require_client = __commonJS({
         return this[kNeedDrain] < 2;
       }
       async [kClose]() {
-        return new Promise((resolve) => {
+        return new Promise((resolve2) => {
           if (this[kSize]) {
-            this[kClosedResolve] = resolve;
+            this[kClosedResolve] = resolve2;
           } else {
-            resolve(null);
+            resolve2(null);
           }
         });
       }
       async [kDestroy](err) {
-        return new Promise((resolve) => {
+        return new Promise((resolve2) => {
           const requests = this[kQueue].splice(this[kPendingIdx]);
           for (let i = 0; i < requests.length; i++) {
             const request = requests[i];
@@ -7799,7 +7799,7 @@ var require_client = __commonJS({
               this[kClosedResolve]();
               this[kClosedResolve] = null;
             }
-            resolve(null);
+            resolve2(null);
           };
           if (this[kHTTPContext]) {
             this[kHTTPContext].destroy(err, callback);
@@ -7850,7 +7850,7 @@ var require_client = __commonJS({
         });
       }
       try {
-        const socket = await new Promise((resolve, reject) => {
+        const socket = await new Promise((resolve2, reject) => {
           client[kConnector]({
             host,
             hostname,
@@ -7862,7 +7862,7 @@ var require_client = __commonJS({
             if (err) {
               reject(err);
             } else {
-              resolve(socket2);
+              resolve2(socket2);
             }
           });
         });
@@ -8198,8 +8198,8 @@ var require_pool_base = __commonJS({
         if (this[kQueue].isEmpty()) {
           await Promise.all(this[kClients].map((c) => c.close()));
         } else {
-          await new Promise((resolve) => {
-            this[kClosedResolve] = resolve;
+          await new Promise((resolve2) => {
+            this[kClosedResolve] = resolve2;
           });
         }
       }
@@ -9442,7 +9442,7 @@ var require_readable = __commonJS({
         if (this._readableState.closeEmitted) {
           return null;
         }
-        return await new Promise((resolve, reject) => {
+        return await new Promise((resolve2, reject) => {
           if (this[kContentLength] > limit) {
             this.destroy(new AbortError());
           }
@@ -9455,7 +9455,7 @@ var require_readable = __commonJS({
             if (signal?.aborted) {
               reject(signal.reason ?? new AbortError());
             } else {
-              resolve(null);
+              resolve2(null);
             }
           }).on("error", noop).on("data", function(chunk) {
             limit -= chunk.length;
@@ -9474,7 +9474,7 @@ var require_readable = __commonJS({
     }
     async function consume(stream, type) {
       assert(!stream[kConsume]);
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve2, reject) => {
         if (isUnusable(stream)) {
           const rState = stream._readableState;
           if (rState.destroyed && rState.closeEmitted === false) {
@@ -9491,7 +9491,7 @@ var require_readable = __commonJS({
             stream[kConsume] = {
               type,
               stream,
-              resolve,
+              resolve: resolve2,
               reject,
               length: 0,
               body: []
@@ -9561,18 +9561,18 @@ var require_readable = __commonJS({
       return buffer;
     }
     function consumeEnd(consume2) {
-      const { type, body, resolve, stream, length } = consume2;
+      const { type, body, resolve: resolve2, stream, length } = consume2;
       try {
         if (type === "text") {
-          resolve(chunksDecode(body, length));
+          resolve2(chunksDecode(body, length));
         } else if (type === "json") {
-          resolve(JSON.parse(chunksDecode(body, length)));
+          resolve2(JSON.parse(chunksDecode(body, length)));
         } else if (type === "arrayBuffer") {
-          resolve(chunksConcat(body, length).buffer);
+          resolve2(chunksConcat(body, length).buffer);
         } else if (type === "blob") {
-          resolve(new Blob(body, { type: stream[kContentType] }));
+          resolve2(new Blob(body, { type: stream[kContentType] }));
         } else if (type === "bytes") {
-          resolve(chunksConcat(body, length));
+          resolve2(chunksConcat(body, length));
         }
         consumeFinish(consume2);
       } catch (err) {
@@ -9829,9 +9829,9 @@ var require_api_request = __commonJS({
     };
     function request(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve2, reject) => {
           request.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve(data);
+            return err ? reject(err) : resolve2(data);
           });
         });
       }
@@ -10054,9 +10054,9 @@ var require_api_stream = __commonJS({
     };
     function stream(opts, factory, callback) {
       if (callback === void 0) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve2, reject) => {
           stream.call(this, opts, factory, (err, data) => {
-            return err ? reject(err) : resolve(data);
+            return err ? reject(err) : resolve2(data);
           });
         });
       }
@@ -10341,9 +10341,9 @@ var require_api_upgrade = __commonJS({
     };
     function upgrade(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve2, reject) => {
           upgrade.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve(data);
+            return err ? reject(err) : resolve2(data);
           });
         });
       }
@@ -10435,9 +10435,9 @@ var require_api_connect = __commonJS({
     };
     function connect(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve2, reject) => {
           connect.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve(data);
+            return err ? reject(err) : resolve2(data);
           });
         });
       }
@@ -14299,7 +14299,7 @@ var require_fetch = __commonJS({
       function dispatch({ body }) {
         const url = requestCurrentURL(request);
         const agent = fetchParams.controller.dispatcher;
-        return new Promise((resolve, reject) => agent.dispatch(
+        return new Promise((resolve2, reject) => agent.dispatch(
           {
             path: url.pathname + url.search,
             origin: url.origin,
@@ -14375,7 +14375,7 @@ var require_fetch = __commonJS({
                 }
               }
               const onError = this.onError.bind(this);
-              resolve({
+              resolve2({
                 status,
                 statusText,
                 headersList,
@@ -14421,7 +14421,7 @@ var require_fetch = __commonJS({
               for (let i = 0; i < rawHeaders.length; i += 2) {
                 headersList.append(bufferToLowerCasedHeaderName(rawHeaders[i]), rawHeaders[i + 1].toString("latin1"), true);
               }
-              resolve({
+              resolve2({
                 status,
                 statusText: STATUS_CODES[status],
                 headersList,
@@ -18151,8 +18151,8 @@ var require_util8 = __commonJS({
       return true;
     }
     function delay(ms) {
-      return new Promise((resolve) => {
-        setTimeout(resolve, ms).unref();
+      return new Promise((resolve2) => {
+        setTimeout(resolve2, ms).unref();
       });
     }
     module2.exports = {
@@ -19001,11 +19001,11 @@ var import_os = require("os");
 var import_fs = require("fs");
 var __awaiter = function(thisArg, _arguments, P, generator) {
   function adopt(value) {
-    return value instanceof P ? value : new P(function(resolve) {
-      resolve(value);
+    return value instanceof P ? value : new P(function(resolve2) {
+      resolve2(value);
     });
   }
-  return new (P || (P = Promise))(function(resolve, reject) {
+  return new (P || (P = Promise))(function(resolve2, reject) {
     function fulfilled(value) {
       try {
         step(generator.next(value));
@@ -19021,7 +19021,7 @@ var __awaiter = function(thisArg, _arguments, P, generator) {
       }
     }
     function step(result) {
-      result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+      result.done ? resolve2(result.value) : adopt(result.value).then(fulfilled, rejected);
     }
     step((generator = generator.apply(thisArg, _arguments || [])).next());
   });
@@ -19505,7 +19505,7 @@ function asRecord(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 function sleep(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  return new Promise((resolve2) => setTimeout(resolve2, milliseconds));
 }
 function responseDelay(response, attempt) {
   const retryAfter = response.headers.get("retry-after");
@@ -19557,6 +19557,26 @@ var PostmanClient = class {
       const displayName = typeof role.displayName === "string" ? role.displayName.trim() : "";
       return id && displayName ? [{ id, displayName }] : [];
     });
+  }
+  async getWorkspace(workspaceId) {
+    const payload = await this.requestJson(`/workspaces/${encodeURIComponent(workspaceId)}`, {
+      method: "GET",
+      headers: { "x-api-key": this.postmanApiKey }
+    }, [200]);
+    const workspace = asRecord(payload.workspace);
+    const id = typeof workspace.id === "string" || typeof workspace.id === "number" ? String(workspace.id).trim() : "";
+    if (!id) throw new Error(`Postman did not return workspace ${workspaceId}.`);
+    const name = typeof workspace.name === "string" ? workspace.name.trim() : "";
+    return { id, ...name ? { name } : {} };
+  }
+  async checkScimAccess() {
+    if (!this.scimApiKey) {
+      throw new Error("POSTMAN_SCIM_API_KEY is required for doctor mode.");
+    }
+    await this.requestJson("/scim/v2/Users?count=1&startIndex=1", {
+      method: "GET",
+      headers: { Authorization: this.scimApiKey }
+    }, [200]);
   }
   async findScimUserByEmail(email) {
     if (!this.scimApiKey) return void 0;
@@ -19812,13 +19832,57 @@ async function reconcileWorkspaceAccess(client, options, reporter) {
 
 // src/runtime.ts
 var import_promises = require("node:fs/promises");
-async function loadMembers(membersJson, membersFile, roleMapJson) {
+var import_node_path = require("node:path");
+var SCANNER_FILENAMES = /* @__PURE__ */ new Set([
+  "deloitte-github-scanner-output.json",
+  "github-scanner-output.json",
+  "scanner-output.json"
+]);
+var SKIPPED_DIRECTORIES = /* @__PURE__ */ new Set([".git", "node_modules"]);
+async function findScannerFiles(directory, results) {
+  const entries = await (0, import_promises.readdir)(directory, { withFileTypes: true });
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const path = (0, import_node_path.join)(directory, entry.name);
+    if (entry.isDirectory() && !SKIPPED_DIRECTORIES.has(entry.name)) {
+      await findScannerFiles(path, results);
+    } else if (entry.isFile() && SCANNER_FILENAMES.has(entry.name.toLowerCase())) {
+      results.push(path);
+    }
+  }
+}
+async function discoverMembersFile(searchRoot = process.cwd()) {
+  const root = (0, import_node_path.resolve)(searchRoot);
+  const matches = [];
+  try {
+    await findScannerFiles(root, matches);
+  } catch (error2) {
+    throw new Error(
+      `Unable to search scanner root ${root}: ${error2 instanceof Error ? error2.message : String(error2)}`
+    );
+  }
+  if (matches.length === 0) {
+    throw new Error(
+      `No scanner output was found under ${root}. Expected one file named ${[...SCANNER_FILENAMES].join(", ")}.`
+    );
+  }
+  if (matches.length > 1) {
+    const candidates = matches.map((path) => (0, import_node_path.relative)(root, path) || path).join(", ");
+    throw new Error(`Multiple scanner outputs were found under ${root}: ${candidates}. Set members-file explicitly.`);
+  }
+  return matches[0];
+}
+async function resolveMembersInput(membersJson, membersFile, roleMapJson, scannerSearchRoot) {
   const inline = membersJson?.trim();
-  const path = membersFile?.trim();
-  if (inline && path) throw new Error("Provide only one of members-json or members-file.");
-  if (!inline && !path) throw new Error("Provide members-json or members-file.");
+  const explicitPath = membersFile?.trim();
+  if (inline && explicitPath) throw new Error("Provide only one of members-json or members-file.");
+  const discovered = !inline && !explicitPath;
+  const path = explicitPath ?? (discovered ? await discoverMembersFile(scannerSearchRoot) : void 0);
   const source = inline ?? await (0, import_promises.readFile)(path, "utf8");
-  return parseMembersJson(source, parseRoleMap(roleMapJson));
+  return {
+    members: parseMembersJson(source, parseRoleMap(roleMapJson)),
+    source: inline ? "inline JSON" : (0, import_node_path.resolve)(path),
+    discovered
+  };
 }
 function formatSummary(summary2) {
   return JSON.stringify(summary2, null, 2);
@@ -19836,11 +19900,13 @@ async function runAction() {
     const scimApiKey = optionalInput("postman-scim-api-key");
     setSecret(postmanApiKey);
     if (scimApiKey) setSecret(scimApiKey);
-    const members = await loadMembers(
+    const resolved = await resolveMembersInput(
       optionalInput("members-json"),
       optionalInput("members-file"),
-      optionalInput("role-map-json")
+      optionalInput("role-map-json"),
+      optionalInput("scanner-search-root")
     );
+    if (resolved.discovered) info(`Auto-discovered scanner output at ${resolved.source}.`);
     const dryRun = parseBoolean(optionalInput("dry-run"));
     const failOnPending = parseBoolean(optionalInput("fail-on-pending-invites"));
     const baseUrl = optionalInput("postman-base-url");
@@ -19851,7 +19917,7 @@ async function runAction() {
     });
     const summary2 = await reconcileWorkspaceAccess(client, {
       workspaceId,
-      members,
+      members: resolved.members,
       dryRun
     }, {
       info: (message) => info(message),
@@ -19863,6 +19929,7 @@ async function runAction() {
     setOutput("pending-count", String(summary2.counts.pending));
     setOutput("skipped-count", String(summary2.counts.skipped));
     setOutput("failed-count", String(summary2.counts.failed));
+    setOutput("scanner-source", resolved.source);
     await summary.addHeading("Postman workspace access").addCodeBlock(formatSummary(summary2), "json").write();
     if (summary2.counts.failed > 0) {
       throw new Error(`${summary2.counts.failed} workspace access operation(s) failed.`);

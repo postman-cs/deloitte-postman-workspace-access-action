@@ -1,0 +1,93 @@
+# Deloitte Workspace Access Runbook
+
+This is Sharooq's operating path for adding GitHub scanner users to a Postman workspace.
+
+## One-time setup
+
+Add these GitHub Actions secrets to the Deloitte pipeline repository:
+
+- `POSTMAN_API_KEY`
+- `POSTMAN_SCIM_API_KEY`
+
+The installer creates a local action, a reusable workflow, and a doctor command. Do not store either key in a repository variable, scanner artifact, or log.
+
+## Verify before the first run
+
+From the consumer repository:
+
+```bash
+export POSTMAN_API_KEY
+export POSTMAN_SCIM_API_KEY
+
+./scripts/deloitte-postman-doctor.sh \
+  --workspace-id "${POSTMAN_WORKSPACE_ID}" \
+  --scanner-search-root artifacts
+```
+
+Doctor mode checks the workspace, both credentials, scanner contract, user lookups, and role mapping. It sends only `GET` requests and never invites users or changes workspace access.
+
+Recognized scanner filenames are:
+
+- `deloitte-github-scanner-output.json`
+- `github-scanner-output.json`
+- `scanner-output.json`
+
+The action searches recursively. If more than one recognized file exists, set `members-file` explicitly rather than risking the wrong inventory.
+
+## Add the reusable workflow to Deloitte's pipeline
+
+If the scanner uploads an artifact, add this job after the existing onboarding and scanner jobs. Replace the two job IDs and output names with Deloitte's actual values:
+
+```yaml
+  deloitte-workspace-access:
+    needs: [onboard, github-scanner]
+    uses: ./.github/workflows/deloitte-postman-workspace-access.yml
+    with:
+      workspace-id: ${{ needs.onboard.outputs['workspace-id'] }}
+      scanner-artifact: ${{ needs['github-scanner'].outputs['artifact-name'] }}
+      apply: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      fail-on-pending-invites: false
+    secrets: inherit
+```
+
+This gives Sharooq a read-only preview on pull requests and applies the same plan after merge to `main`.
+
+If the scanner writes its JSON into the checked-out workspace instead of an artifact, omit `scanner-artifact`. The action will find the file automatically.
+
+## Understand a run
+
+The GitHub job summary lists every user and one of these outcomes:
+
+- `added`: workspace access was assigned.
+- `would-add`: preview only; no write occurred.
+- `pending`: Postman invited the user, but workspace access must wait for acceptance.
+- `failed`: the entry needs intervention.
+
+Lifecycle values explain what happened to the team user:
+
+- `existing` or `provided-scim-id`: current user.
+- `reactivated`: inactive user restored.
+- `provisioned`: missing user invited or created.
+- `would-reactivate` or `would-provision`: preview of a planned action.
+
+## Fix common failures
+
+| Symptom | What Sharooq should do |
+| --- | --- |
+| No scanner output found | Confirm the scanner artifact was downloaded or rename its JSON to one of the recognized filenames. |
+| Multiple scanner outputs found | Remove stale artifacts or pass one exact `members-file` path in a direct action step. |
+| Unknown GitHub permission | Add the permission to `role-map-json`, or have the scanner emit `workspaceRole`. |
+| Workspace role is unavailable | Confirm the Postman workspace exposes `Admin`, `Editor`, and `Viewer`, or update the role map. |
+| `401` or `403` from Postman | Rotate the affected secret and confirm it belongs to an account authorized for the workspace/team. |
+| Invitation is pending | Ask the user to accept the Postman team invite, then rerun the same job. |
+| One user fails after a batch retry | Use that user's error in the job summary; successful users have already been handled idempotently. |
+
+## Upgrade
+
+Run the newer release's installer with `--upgrade`. It overwrites only the four files owned by this starter kit:
+
+```bash
+./scripts/deloitte-init.sh /path/to/deloitte-pipeline --upgrade
+```
+
+Run doctor again, review the pull-request preview, and merge only after it matches the expected access plan.

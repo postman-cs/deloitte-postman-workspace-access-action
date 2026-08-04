@@ -41,6 +41,11 @@ export interface WorkspaceRole {
   displayName: string;
 }
 
+export interface WorkspaceIdentity {
+  id: string;
+  name?: string;
+}
+
 export interface ScimUser {
   id: string;
   userName: string;
@@ -86,6 +91,21 @@ export interface ReconcileSummary {
     skipped: number;
     failed: number;
   };
+}
+
+export interface DoctorReport {
+  ok: boolean;
+  workspace: WorkspaceIdentity;
+  scanner: {
+    source: string;
+    members: number;
+  };
+  checks: Array<{
+    name: 'workspace-access' | 'scim-access' | 'scanner-contract' | 'role-mapping' | 'read-only-plan';
+    status: 'passed' | 'failed';
+    message: string;
+  }>;
+  plan: ReconcileSummary;
 }
 
 export interface ReconcileOptions {

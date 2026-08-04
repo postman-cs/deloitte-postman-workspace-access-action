@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
@@ -12,13 +13,17 @@ import {
 } from './e2e-testkit.mjs';
 
 function runCli(baseUrl, workspaceId, members, options = {}) {
-  const args = [
-    'dist/cli.cjs',
-    '--workspace-id', workspaceId,
-    options.membersFile ? '--members-file' : '--members-json',
-    options.membersFile ?? JSON.stringify(members),
-    '--postman-base-url', `${baseUrl}/${options.scenario ?? workspaceId}`
-  ];
+  const args = ['dist/cli.cjs'];
+  if (options.command) args.push(options.command);
+  args.push('--workspace-id', workspaceId);
+  if (!options.autoDiscover) {
+    args.push(
+      options.membersFile ? '--members-file' : '--members-json',
+      options.membersFile ?? JSON.stringify(members)
+    );
+  }
+  if (options.scannerSearchRoot) args.push('--scanner-search-root', options.scannerSearchRoot);
+  args.push('--postman-base-url', `${baseUrl}/${options.scenario ?? workspaceId}`);
   if (options.roleMap) args.push('--role-map-json', JSON.stringify(options.roleMap));
   if (options.dryRun) args.push('--dry-run');
   if (options.failOnPending) args.push('--fail-on-pending-invites');
@@ -141,6 +146,48 @@ try {
     assert.match(noScim.stdout, /SCIM API key is required/);
     assert.equal(simulator.requestsFor('no-scim').some((request) => request.path.startsWith('/scim/')), false);
 
+    const doctorRoot = join(directory, 'doctor-artifact');
+    const doctorFile = join(doctorRoot, 'github-scanner-output.json');
+    await mkdir(doctorRoot);
+    await writeJson(doctorFile, { collaborators: [
+      { email: 'existing.admin@example.com', permission: 'admin' },
+      { email: 'doctor.new@example.com', permission: 'read' }
+    ] });
+    const doctor = await runCli(simulator.baseUrl, 'workspace-doctor', undefined, {
+      command: 'doctor',
+      autoDiscover: true,
+      scannerSearchRoot: doctorRoot,
+      scenario: 'doctor'
+    });
+    assert.equal(doctor.code, 0, doctor.stderr);
+    assertSecretsMasked(doctor);
+    const doctorReport = JSON.parse(doctor.stdout);
+    assert.equal(doctorReport.ok, true);
+    assert.equal(doctorReport.workspace.name, 'Deloitte QA Workspace');
+    assert.equal(doctorReport.scanner.members, 2);
+    assert.equal(doctorReport.plan.dryRun, true);
+    assert.equal(doctorReport.plan.counts.skipped, 2);
+    assert.equal(doctorReport.checks.every((check) => check.status === 'passed'), true);
+    assert.match(doctor.stderr, /Auto-discovered scanner output/);
+    assert.equal(
+      simulator.requestsFor('doctor').every((request) => request.method === 'GET'),
+      true
+    );
+
+    const doctorWithoutScim = await runCli(simulator.baseUrl, 'workspace-doctor-no-scim', undefined, {
+      command: 'doctor',
+      autoDiscover: true,
+      scannerSearchRoot: doctorRoot,
+      scenario: 'doctor-no-scim',
+      scimKey: null
+    });
+    assert.equal(doctorWithoutScim.code, 1);
+    assert.match(doctorWithoutScim.stderr, /POSTMAN_SCIM_API_KEY is required for doctor mode/);
+    assert.equal(
+      simulator.requestsFor('doctor-no-scim').every((request) => request.method === 'GET'),
+      true
+    );
+
     const invalid = await runCli(simulator.baseUrl, 'workspace-invalid', [
       { email: 'not-an-email', permission: 'read' }
     ], { scenario: 'invalid' });
@@ -161,7 +208,7 @@ try {
     assert.match(help.stdout, /postman-workspace-access/);
   });
 
-  process.stdout.write('CLI e2e matrix: 10 lifecycle, retry, fallback, validation, and exit-code paths passed.\n');
+  process.stdout.write('CLI e2e matrix: lifecycle, doctor, discovery, retry, fallback, validation, and exit-code paths passed.\n');
 } finally {
   await simulator.close();
 }

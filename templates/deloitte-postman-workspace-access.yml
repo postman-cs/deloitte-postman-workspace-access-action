@@ -1,0 +1,77 @@
+name: Deloitte Postman workspace access
+
+on:
+  workflow_call:
+    inputs:
+      workspace-id:
+        description: Workspace created or reused by the Postman onboarding job.
+        required: true
+        type: string
+      scanner-artifact:
+        description: Optional artifact containing the GitHub scanner JSON. Leave empty when the file is already in the checkout.
+        required: false
+        default: ''
+        type: string
+      scanner-search-root:
+        description: Directory containing the scanner output, or the destination for scanner-artifact.
+        required: false
+        default: .
+        type: string
+      apply:
+        description: Apply changes. False performs a read-only preview.
+        required: false
+        default: false
+        type: boolean
+      fail-on-pending-invites:
+        description: Fail the job while newly invited users are waiting to accept.
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      POSTMAN_API_KEY:
+        required: true
+      POSTMAN_SCIM_API_KEY:
+        required: true
+    outputs:
+      summary-json:
+        description: Machine-readable reconciliation summary.
+        value: ${{ jobs.reconcile.outputs['summary-json'] }}
+      pending-count:
+        description: Invited users waiting before workspace access can be assigned.
+        value: ${{ jobs.reconcile.outputs['pending-count'] }}
+      failed-count:
+        description: Failed reconciliation entries.
+        value: ${{ jobs.reconcile.outputs['failed-count'] }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    outputs:
+      summary-json: ${{ steps.access.outputs['summary-json'] }}
+      pending-count: ${{ steps.access.outputs['pending-count'] }}
+      failed-count: ${{ steps.access.outputs['failed-count'] }}
+    steps:
+      - name: Check out pipeline repository
+        uses: actions/checkout@v7
+
+      - name: Download GitHub scanner artifact
+        if: ${{ inputs['scanner-artifact'] != '' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs['scanner-artifact'] }}
+          path: ${{ inputs['scanner-search-root'] }}
+
+      - name: Reconcile Deloitte workspace access
+        id: access
+        uses: ./.github/actions/deloitte-postman-workspace-access
+        with:
+          workspace-id: ${{ inputs['workspace-id'] }}
+          scanner-search-root: ${{ inputs['scanner-search-root'] }}
+          postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+          postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
+          dry-run: ${{ !inputs.apply }}
+          fail-on-pending-invites: ${{ inputs['fail-on-pending-invites'] }}

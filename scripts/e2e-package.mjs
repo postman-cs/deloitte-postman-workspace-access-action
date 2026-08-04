@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
@@ -30,11 +30,24 @@ try {
       'utf8'
     ));
     assert.equal(installedPackage.name, '@postman-cse/deloitte-workspace-access');
-    assert.equal(installedPackage.version, '0.1.1');
+    assert.equal(installedPackage.version, '0.2.0');
     assert.equal(installedPackage.bin['postman-workspace-access'], 'dist/cli.cjs');
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/action.yml'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/QUICKSTART.md'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/schemas/deloitte-github-scanner-output.schema.json'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/scripts/deloitte-init.sh'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/templates/deloitte-postman-workspace-access.yml'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/docs/SHAROOQ-RUNBOOK.md'));
+
+    const packagedConsumer = join(directory, 'packaged-consumer');
+    await mkdir(packagedConsumer);
+    const packagedInstall = await runProcess('bash', [
+      join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/scripts/deloitte-init.sh'),
+      packagedConsumer
+    ]);
+    assert.equal(packagedInstall.code, 0, packagedInstall.stderr);
+    await readFile(join(packagedConsumer, '.github/actions/deloitte-postman-workspace-access/dist/index.cjs'));
+    await readFile(join(packagedConsumer, '.github/workflows/deloitte-postman-workspace-access.yml'));
 
     const binary = join(packageRoot, 'node_modules/.bin/postman-workspace-access');
     const result = await runProcess(binary, [
@@ -51,7 +64,7 @@ try {
     });
   });
 
-  process.stdout.write('Package e2e: packed artifact installed and its published CLI reconciled a workspace successfully.\n');
+  process.stdout.write('Package e2e: packed CLI and packaged Sharooq installer both executed successfully.\n');
 } finally {
   await simulator.close();
 }

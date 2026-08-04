@@ -12,8 +12,12 @@ inputs:
     description: JSON array emitted by the GitHub scanner. Provide this or members-file.
     required: false
   members-file:
-    description: Path to a JSON file emitted by the GitHub scanner. Provide this or members-json.
+    description: Path to a JSON file emitted by the GitHub scanner. If omitted with members-json, the action auto-discovers a uniquely named scanner output.
     required: false
+  scanner-search-root:
+    description: Root directory searched recursively when members-file and members-json are omitted.
+    required: false
+    default: .
   role-map-json:
     description: JSON map of GitHub permission names to Postman workspace role display names.
     required: false
@@ -49,6 +53,8 @@ outputs:
     description: Number of dry-run or otherwise skipped entries.
   failed-count:
     description: Number of failed entries.
+  scanner-source:
+    description: Inline JSON or the resolved absolute scanner-output path used by the action.
 runs:
   using: node24
   main: dist/index.cjs

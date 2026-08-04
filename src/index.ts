@@ -3,7 +3,7 @@ import * as core from '@actions/core';
 import { parseBoolean } from './contracts.js';
 import { PostmanClient } from './postman-client.js';
 import { reconcileWorkspaceAccess } from './reconcile.js';
-import { formatSummary, loadMembers } from './runtime.js';
+import { formatSummary, resolveMembersInput } from './runtime.js';
 
 function optionalInput(name: string): string | undefined {
   const value = core.getInput(name).trim();
@@ -18,11 +18,13 @@ export async function runAction(): Promise<void> {
     core.setSecret(postmanApiKey);
     if (scimApiKey) core.setSecret(scimApiKey);
 
-    const members = await loadMembers(
+    const resolved = await resolveMembersInput(
       optionalInput('members-json'),
       optionalInput('members-file'),
-      optionalInput('role-map-json')
+      optionalInput('role-map-json'),
+      optionalInput('scanner-search-root')
     );
+    if (resolved.discovered) core.info(`Auto-discovered scanner output at ${resolved.source}.`);
     const dryRun = parseBoolean(optionalInput('dry-run'));
     const failOnPending = parseBoolean(optionalInput('fail-on-pending-invites'));
     const baseUrl = optionalInput('postman-base-url');
@@ -34,7 +36,7 @@ export async function runAction(): Promise<void> {
 
     const summary = await reconcileWorkspaceAccess(client, {
       workspaceId,
-      members,
+      members: resolved.members,
       dryRun
     }, {
       info: (message) => core.info(message),
@@ -47,6 +49,7 @@ export async function runAction(): Promise<void> {
     core.setOutput('pending-count', String(summary.counts.pending));
     core.setOutput('skipped-count', String(summary.counts.skipped));
     core.setOutput('failed-count', String(summary.counts.failed));
+    core.setOutput('scanner-source', resolved.source);
     await core.summary
       .addHeading('Postman workspace access')
       .addCodeBlock(formatSummary(summary), 'json')

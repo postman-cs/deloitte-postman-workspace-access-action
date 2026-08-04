@@ -2,6 +2,7 @@ import type {
   FetchLike,
   NormalizedMember,
   ScimUser,
+  WorkspaceIdentity,
   WorkspaceRole
 } from './types.js';
 
@@ -102,6 +103,30 @@ export class PostmanClient {
       const displayName = typeof role.displayName === 'string' ? role.displayName.trim() : '';
       return id && displayName ? [{ id, displayName }] : [];
     });
+  }
+
+  async getWorkspace(workspaceId: string): Promise<WorkspaceIdentity> {
+    const payload = await this.requestJson(`/workspaces/${encodeURIComponent(workspaceId)}`, {
+      method: 'GET',
+      headers: { 'x-api-key': this.postmanApiKey }
+    }, [200]);
+    const workspace = asRecord(payload.workspace);
+    const id = typeof workspace.id === 'string' || typeof workspace.id === 'number'
+      ? String(workspace.id).trim()
+      : '';
+    if (!id) throw new Error(`Postman did not return workspace ${workspaceId}.`);
+    const name = typeof workspace.name === 'string' ? workspace.name.trim() : '';
+    return { id, ...(name ? { name } : {}) };
+  }
+
+  async checkScimAccess(): Promise<void> {
+    if (!this.scimApiKey) {
+      throw new Error('POSTMAN_SCIM_API_KEY is required for doctor mode.');
+    }
+    await this.requestJson('/scim/v2/Users?count=1&startIndex=1', {
+      method: 'GET',
+      headers: { Authorization: this.scimApiKey }
+    }, [200]);
   }
 
   async findScimUserByEmail(email: string): Promise<ScimUser | undefined> {
