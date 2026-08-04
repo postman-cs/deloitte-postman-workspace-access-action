@@ -28,6 +28,7 @@ describe('GitHub Action contract', () => {
     expect(Object.keys(action.inputs ?? {})).toEqual(expect.arrayContaining([
       'members-json',
       'members-file',
+      'scanner-search-root',
       'role-map-json',
       'dry-run',
       'fail-on-pending-invites'
@@ -37,7 +38,8 @@ describe('GitHub Action contract', () => {
       'added-count',
       'invited-count',
       'pending-count',
-      'failed-count'
+      'failed-count',
+      'scanner-source'
     ]));
     expect(() => JSON.parse(action.inputs?.['role-map-json']?.default ?? '')).not.toThrow();
   });

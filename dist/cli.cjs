@@ -193,7 +193,7 @@ function asRecord(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 function sleep(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  return new Promise((resolve2) => setTimeout(resolve2, milliseconds));
 }
 function responseDelay(response, attempt) {
   const retryAfter = response.headers.get("retry-after");
@@ -245,6 +245,26 @@ var PostmanClient = class {
       const displayName = typeof role.displayName === "string" ? role.displayName.trim() : "";
       return id && displayName ? [{ id, displayName }] : [];
     });
+  }
+  async getWorkspace(workspaceId) {
+    const payload = await this.requestJson(`/workspaces/${encodeURIComponent(workspaceId)}`, {
+      method: "GET",
+      headers: { "x-api-key": this.postmanApiKey }
+    }, [200]);
+    const workspace = asRecord(payload.workspace);
+    const id = typeof workspace.id === "string" || typeof workspace.id === "number" ? String(workspace.id).trim() : "";
+    if (!id) throw new Error(`Postman did not return workspace ${workspaceId}.`);
+    const name = typeof workspace.name === "string" ? workspace.name.trim() : "";
+    return { id, ...name ? { name } : {} };
+  }
+  async checkScimAccess() {
+    if (!this.scimApiKey) {
+      throw new Error("POSTMAN_SCIM_API_KEY is required for doctor mode.");
+    }
+    await this.requestJson("/scim/v2/Users?count=1&startIndex=1", {
+      method: "GET",
+      headers: { Authorization: this.scimApiKey }
+    }, [200]);
   }
   async findScimUserByEmail(email) {
     if (!this.scimApiKey) return void 0;
@@ -498,15 +518,107 @@ async function reconcileWorkspaceAccess(client, options, reporter) {
   return summarize(options.workspaceId, false, results);
 }
 
+// src/doctor.ts
+async function diagnoseWorkspaceAccess(client, options, reporter) {
+  const workspace = await client.getWorkspace(options.workspaceId);
+  await client.checkScimAccess();
+  const plan = await reconcileWorkspaceAccess(client, {
+    workspaceId: options.workspaceId,
+    members: options.members,
+    dryRun: true
+  }, reporter);
+  const roleMappingOk = plan.counts.failed === 0;
+  return {
+    ok: roleMappingOk,
+    workspace,
+    scanner: {
+      source: options.scannerSource,
+      members: options.members.length
+    },
+    checks: [
+      {
+        name: "workspace-access",
+        status: "passed",
+        message: `POSTMAN_API_KEY can read workspace ${workspace.name ?? workspace.id}.`
+      },
+      {
+        name: "scim-access",
+        status: "passed",
+        message: "POSTMAN_SCIM_API_KEY can read the team directory."
+      },
+      {
+        name: "scanner-contract",
+        status: "passed",
+        message: `Validated and normalized ${options.members.length} unique member(s).`
+      },
+      {
+        name: "role-mapping",
+        status: roleMappingOk ? "passed" : "failed",
+        message: roleMappingOk ? "Every requested Postman workspace role is available." : `${plan.counts.failed} member(s) request unavailable workspace roles.`
+      },
+      {
+        name: "read-only-plan",
+        status: "passed",
+        message: "Doctor mode issued read-only requests; no users or workspace roles were changed."
+      }
+    ],
+    plan
+  };
+}
+
 // src/runtime.ts
 var import_promises = require("node:fs/promises");
-async function loadMembers(membersJson, membersFile, roleMapJson) {
+var import_node_path = require("node:path");
+var SCANNER_FILENAMES = /* @__PURE__ */ new Set([
+  "deloitte-github-scanner-output.json",
+  "github-scanner-output.json",
+  "scanner-output.json"
+]);
+var SKIPPED_DIRECTORIES = /* @__PURE__ */ new Set([".git", "node_modules"]);
+async function findScannerFiles(directory, results) {
+  const entries = await (0, import_promises.readdir)(directory, { withFileTypes: true });
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const path = (0, import_node_path.join)(directory, entry.name);
+    if (entry.isDirectory() && !SKIPPED_DIRECTORIES.has(entry.name)) {
+      await findScannerFiles(path, results);
+    } else if (entry.isFile() && SCANNER_FILENAMES.has(entry.name.toLowerCase())) {
+      results.push(path);
+    }
+  }
+}
+async function discoverMembersFile(searchRoot = process.cwd()) {
+  const root = (0, import_node_path.resolve)(searchRoot);
+  const matches = [];
+  try {
+    await findScannerFiles(root, matches);
+  } catch (error) {
+    throw new Error(
+      `Unable to search scanner root ${root}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  if (matches.length === 0) {
+    throw new Error(
+      `No scanner output was found under ${root}. Expected one file named ${[...SCANNER_FILENAMES].join(", ")}.`
+    );
+  }
+  if (matches.length > 1) {
+    const candidates = matches.map((path) => (0, import_node_path.relative)(root, path) || path).join(", ");
+    throw new Error(`Multiple scanner outputs were found under ${root}: ${candidates}. Set members-file explicitly.`);
+  }
+  return matches[0];
+}
+async function resolveMembersInput(membersJson, membersFile, roleMapJson, scannerSearchRoot) {
   const inline = membersJson?.trim();
-  const path = membersFile?.trim();
-  if (inline && path) throw new Error("Provide only one of members-json or members-file.");
-  if (!inline && !path) throw new Error("Provide members-json or members-file.");
+  const explicitPath = membersFile?.trim();
+  if (inline && explicitPath) throw new Error("Provide only one of members-json or members-file.");
+  const discovered = !inline && !explicitPath;
+  const path = explicitPath ?? (discovered ? await discoverMembersFile(scannerSearchRoot) : void 0);
   const source = inline ?? await (0, import_promises.readFile)(path, "utf8");
-  return parseMembersJson(source, parseRoleMap(roleMapJson));
+  return {
+    members: parseMembersJson(source, parseRoleMap(roleMapJson)),
+    source: inline ? "inline JSON" : (0, import_node_path.resolve)(path),
+    discovered
+  };
 }
 function formatSummary(summary) {
   return JSON.stringify(summary, null, 2);
@@ -519,11 +631,13 @@ Reconcile scanner-produced collaborators into a Postman workspace.
 
 Usage:
   postman-workspace-access --workspace-id <id> --members-file <path> [options]
+  postman-workspace-access doctor --workspace-id <id> [options]
 
 Options:
   --workspace-id <id>               Target Postman workspace ID.
   --members-file <path>             Scanner output JSON file.
   --members-json <json>             Inline scanner output JSON.
+  --scanner-search-root <path>      Root used to auto-discover scanner output; defaults to current directory.
   --role-map-json <json>            GitHub permission to Postman role map.
   --postman-base-url <url>          Defaults to https://api.postman.com.
   --dry-run                         Plan without writes.
@@ -535,14 +649,17 @@ Environment:
   POSTMAN_SCIM_API_KEY               Required to provision or invite missing users.
 `;
 async function runCli(argv = process.argv.slice(2)) {
+  const doctor = argv[0] === "doctor";
+  const commandArgs = doctor ? argv.slice(1) : argv;
   const { values } = (0, import_node_util.parseArgs)({
-    args: argv,
+    args: commandArgs,
     allowPositionals: false,
     strict: true,
     options: {
       "workspace-id": { type: "string" },
       "members-file": { type: "string" },
       "members-json": { type: "string" },
+      "scanner-search-root": { type: "string", default: process.cwd() },
       "role-map-json": { type: "string", default: JSON.stringify(DEFAULT_ROLE_MAP) },
       "postman-base-url": { type: "string", default: "https://api.postman.com" },
       "dry-run": { type: "boolean", default: false },
@@ -558,19 +675,37 @@ async function runCli(argv = process.argv.slice(2)) {
   if (!workspaceId) throw new Error("--workspace-id is required.");
   const postmanApiKey = process.env.POSTMAN_API_KEY?.trim();
   if (!postmanApiKey) throw new Error("POSTMAN_API_KEY is required.");
-  const members = await loadMembers(
+  const resolved = await resolveMembersInput(
     values["members-json"],
     values["members-file"],
-    values["role-map-json"]
+    values["role-map-json"],
+    values["scanner-search-root"]
   );
+  if (resolved.discovered) process.stderr.write(`info: Auto-discovered scanner output at ${resolved.source}.
+`);
   const client = new PostmanClient({
     postmanApiKey,
     ...process.env.POSTMAN_SCIM_API_KEY?.trim() ? { scimApiKey: process.env.POSTMAN_SCIM_API_KEY.trim() } : {},
     ...values["postman-base-url"] ? { baseUrl: values["postman-base-url"] } : {}
   });
+  if (doctor) {
+    const report = await diagnoseWorkspaceAccess(client, {
+      workspaceId,
+      members: resolved.members,
+      scannerSource: resolved.source
+    }, {
+      info: (message) => process.stderr.write(`info: ${message}
+`),
+      warning: (message) => process.stderr.write(`warning: ${message}
+`)
+    });
+    process.stdout.write(`${formatSummary(report)}
+`);
+    return report.ok ? 0 : 1;
+  }
   const summary = await reconcileWorkspaceAccess(client, {
     workspaceId,
-    members,
+    members: resolved.members,
     dryRun: parseBoolean(String(values["dry-run"]))
   }, {
     info: (message) => process.stderr.write(`info: ${message}

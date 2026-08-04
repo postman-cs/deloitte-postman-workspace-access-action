@@ -1,9 +1,10 @@
 import { parseArgs } from 'node:util';
 
 import { DEFAULT_ROLE_MAP, parseBoolean } from './contracts.js';
+import { diagnoseWorkspaceAccess } from './doctor.js';
 import { PostmanClient } from './postman-client.js';
 import { reconcileWorkspaceAccess } from './reconcile.js';
-import { formatSummary, loadMembers } from './runtime.js';
+import { formatSummary, resolveMembersInput } from './runtime.js';
 
 const HELP = `postman-workspace-access
 
@@ -11,11 +12,13 @@ Reconcile scanner-produced collaborators into a Postman workspace.
 
 Usage:
   postman-workspace-access --workspace-id <id> --members-file <path> [options]
+  postman-workspace-access doctor --workspace-id <id> [options]
 
 Options:
   --workspace-id <id>               Target Postman workspace ID.
   --members-file <path>             Scanner output JSON file.
   --members-json <json>             Inline scanner output JSON.
+  --scanner-search-root <path>      Root used to auto-discover scanner output; defaults to current directory.
   --role-map-json <json>            GitHub permission to Postman role map.
   --postman-base-url <url>          Defaults to https://api.postman.com.
   --dry-run                         Plan without writes.
@@ -28,14 +31,17 @@ Environment:
 `;
 
 export async function runCli(argv = process.argv.slice(2)): Promise<number> {
+  const doctor = argv[0] === 'doctor';
+  const commandArgs = doctor ? argv.slice(1) : argv;
   const { values } = parseArgs({
-    args: argv,
+    args: commandArgs,
     allowPositionals: false,
     strict: true,
     options: {
       'workspace-id': { type: 'string' },
       'members-file': { type: 'string' },
       'members-json': { type: 'string' },
+      'scanner-search-root': { type: 'string', default: process.cwd() },
       'role-map-json': { type: 'string', default: JSON.stringify(DEFAULT_ROLE_MAP) },
       'postman-base-url': { type: 'string', default: 'https://api.postman.com' },
       'dry-run': { type: 'boolean', default: false },
@@ -52,11 +58,13 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
   if (!workspaceId) throw new Error('--workspace-id is required.');
   const postmanApiKey = process.env.POSTMAN_API_KEY?.trim();
   if (!postmanApiKey) throw new Error('POSTMAN_API_KEY is required.');
-  const members = await loadMembers(
+  const resolved = await resolveMembersInput(
     values['members-json'],
     values['members-file'],
-    values['role-map-json']
+    values['role-map-json'],
+    values['scanner-search-root']
   );
+  if (resolved.discovered) process.stderr.write(`info: Auto-discovered scanner output at ${resolved.source}.\n`);
   const client = new PostmanClient({
     postmanApiKey,
     ...(process.env.POSTMAN_SCIM_API_KEY?.trim()
@@ -64,9 +72,21 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
       : {}),
     ...(values['postman-base-url'] ? { baseUrl: values['postman-base-url'] } : {})
   });
+  if (doctor) {
+    const report = await diagnoseWorkspaceAccess(client, {
+      workspaceId,
+      members: resolved.members,
+      scannerSource: resolved.source
+    }, {
+      info: (message) => process.stderr.write(`info: ${message}\n`),
+      warning: (message) => process.stderr.write(`warning: ${message}\n`)
+    });
+    process.stdout.write(`${formatSummary(report)}\n`);
+    return report.ok ? 0 : 1;
+  }
   const summary = await reconcileWorkspaceAccess(client, {
     workspaceId,
-    members,
+    members: resolved.members,
     dryRun: parseBoolean(String(values['dry-run']))
   }, {
     info: (message) => process.stderr.write(`info: ${message}\n`),

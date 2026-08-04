@@ -5,6 +5,29 @@ This action expects two things from the existing onboarding flow:
 1. The ID of the Postman workspace that was created or reused.
 2. A JSON collaborator inventory from Deloitte's GitHub scanner.
 
+## Fastest path for Sharooq
+
+Clone the immutable release and install the complete starter kit into Deloitte's pipeline repository:
+
+```bash
+git clone --branch v0.2.0 --depth 1 \
+  https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
+
+./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
+  /path/to/deloitte-pipeline
+```
+
+The installer adds:
+
+```text
+.github/actions/deloitte-postman-workspace-access/  # pinned runnable action
+.github/workflows/deloitte-postman-workspace-access.yml  # reusable preview/apply workflow
+scripts/deloitte-postman-doctor.sh                  # read-only preflight
+docs/deloitte-postman-workspace-access.md           # Sharooq's runbook
+```
+
+It refuses to overwrite an existing installation. Use `--upgrade` only when intentionally replacing starter-kit-owned files.
+
 ## 1. Configure secrets
 
 Store these in the CI platform's secret manager:
@@ -30,6 +53,8 @@ The smallest accepted payload is:
 
 The action also accepts GitHub's native `permissions` object, known `scimId` values, and explicit `workspaceRole` values. See `examples/deloitte-scanner-output.json` for the full shape.
 
+Name an artifact file `deloitte-github-scanner-output.json`, `github-scanner-output.json`, or `scanner-output.json` and the installed workflow will find it recursively. Multiple matches fail with an explicit error.
+
 ## 3A. Reference the released action
 
 Use this when the consumer repository is allowed to run private actions from `postman-cs`:
@@ -37,10 +62,10 @@ Use this when the consumer repository is allowed to run private actions from `po
 ```yaml
 - name: Reconcile Deloitte workspace access
   id: deloitte-access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.1.1
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.2.0
   with:
-    workspace-id: ${{ steps.onboard.outputs.workspace-id }}
-    members-json: ${{ steps.github-scanner.outputs.members-json }}
+    workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
+    members-json: ${{ steps['github-scanner'].outputs['members-json'] }}
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
     postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
 ```
@@ -50,7 +75,7 @@ Use this when the consumer repository is allowed to run private actions from `po
 Use this when Deloitte wants the runnable bundle in the same repository as its pipeline:
 
 ```bash
-git clone --branch v0.1.1 --depth 1 \
+git clone --branch v0.2.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 cd deloitte-postman-workspace-access-action
@@ -70,11 +95,11 @@ This creates:
 The consuming workflow then uses the local path:
 
 ```yaml
-- uses: actions/checkout@v4
+- uses: actions/checkout@v7
 - name: Reconcile Deloitte workspace access
   uses: ./.github/actions/deloitte-postman-workspace-access
   with:
-    workspace-id: ${{ steps.onboard.outputs.workspace-id }}
+    workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-file: scanner-output.json
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
     postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
@@ -96,6 +121,14 @@ The CLI writes JSON to stdout, so the pipeline can archive or inspect the reconc
 ## 4. Start with dry run
 
 Set `dry-run: 'true'` or pass `--dry-run`. Dry run performs lookups but sends no invitations and changes no workspace roles.
+
+For the first connection, use the installed doctor. It additionally verifies that both credentials can read the target workspace and team directory:
+
+```bash
+./scripts/deloitte-postman-doctor.sh \
+  --workspace-id "${POSTMAN_WORKSPACE_ID}" \
+  --scanner-search-root artifacts
+```
 
 ## 5. Handle pending invitations
 

@@ -24,8 +24,9 @@ async function runAction(entrypoint, directory, baseUrl, workspaceId, members, o
       GITHUB_OUTPUT: outputPath,
       GITHUB_STEP_SUMMARY: summaryPath,
       'INPUT_WORKSPACE-ID': workspaceId,
-      'INPUT_MEMBERS-JSON': JSON.stringify(members),
+      'INPUT_MEMBERS-JSON': options.autoDiscover ? '' : JSON.stringify(members),
       'INPUT_MEMBERS-FILE': '',
+      'INPUT_SCANNER-SEARCH-ROOT': options.scannerSearchRoot ?? '',
       'INPUT_ROLE-MAP-JSON': options.roleMap ? JSON.stringify(options.roleMap) : '',
       'INPUT_POSTMAN-API-KEY': POSTMAN_KEY,
       'INPUT_POSTMAN-SCIM-API-KEY': SCIM_KEY,
@@ -75,6 +76,22 @@ try {
     assert.equal(dryRun.code, 0, dryRun.stderr);
     assert.equal(dryRun.outputs['skipped-count'], '1');
     assert.equal(simulator.requestsFor('action-dryrun').some((request) => ['POST', 'PATCH'].includes(request.method)), false);
+
+    const discoveryRoot = join(directory, 'scanner-artifact');
+    await mkdir(discoveryRoot);
+    await writeFile(join(discoveryRoot, 'deloitte-github-scanner-output.json'), JSON.stringify({ collaborators: [
+      { email: 'action.current@example.com', permission: 'admin' }
+    ] }));
+    const discovered = await runAction('dist/index.cjs', directory, simulator.baseUrl, 'workspace-discovered', undefined, {
+      label: 'discovered',
+      scenario: 'action-discovered',
+      autoDiscover: true,
+      scannerSearchRoot: discoveryRoot
+    });
+    assert.equal(discovered.code, 0, discovered.stderr);
+    assert.equal(discovered.outputs['added-count'], '1');
+    assert.equal(discovered.outputs['scanner-source'], join(discoveryRoot, 'deloitte-github-scanner-output.json'));
+    assert.match(discovered.stdout, /Auto-discovered scanner output/);
 
     const missingInputPath = join(directory, 'missing-input-output.txt');
     const missingSummaryPath = join(directory, 'missing-input-summary.md');

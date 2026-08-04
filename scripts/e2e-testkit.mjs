@@ -87,6 +87,12 @@ export async function startSimulator() {
       ] });
     }
 
+    if (request.method === 'GET' && /^\/workspaces\/[^/]+$/.test(apiPath)) {
+      assert.equal(entry.postmanKey, POSTMAN_KEY);
+      const id = decodeURIComponent(apiPath.slice('/workspaces/'.length));
+      return sendJson(response, 200, { workspace: { id, name: 'Deloitte QA Workspace' } });
+    }
+
     if (request.method === 'GET' && apiPath === '/scim/v2/Users') {
       assert.equal(entry.scimKey, SCIM_KEY);
       const email = scimEmail(url);

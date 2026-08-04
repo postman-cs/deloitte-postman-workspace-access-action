@@ -10,7 +10,28 @@ Plug-and-play workspace membership for API onboarding pipelines. Feed the action
 
 The implementation uses the public Postman [SCIM create-user API](https://learning.postman.com/api-docs/api-reference/scim/create-scim-user) and [workspace-role API](https://learning.postman.com/api-docs/api-reference/workspaces/update-workspace-roles). Workspace role updates use SCIM IDs, so the scanner never needs to know Postman-internal user IDs.
 
-For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). It includes direct, vendored, and generic-CI installation paths.
+For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). Sharooq's one-command installer adds the pinned action, reusable workflow, read-only doctor, and operations runbook to Deloitte's pipeline repository.
+
+## Sharooq's golden path
+
+```bash
+git clone --branch v0.2.0 --depth 1 \
+  https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
+
+./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
+  /path/to/deloitte-pipeline
+```
+
+Then set `POSTMAN_API_KEY` and `POSTMAN_SCIM_API_KEY` as GitHub Actions secrets and run the installed read-only preflight:
+
+```bash
+cd /path/to/deloitte-pipeline
+./scripts/deloitte-postman-doctor.sh \
+  --workspace-id "${POSTMAN_WORKSPACE_ID}" \
+  --scanner-search-root artifacts
+```
+
+The installed runbook contains the caller job Sharooq adds after Deloitte's onboarding and GitHub scanner jobs. Pull requests preview the access plan; pushes to `main` apply it.
 
 ## Fastest integration
 
@@ -26,15 +47,17 @@ For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). It includes d
 
 - name: Reconcile workspace access
   id: access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.1.1
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.2.0
   with:
-    workspace-id: ${{ steps.onboard.outputs.workspace-id }}
-    members-json: ${{ steps.github-scanner.outputs.members-json }}
+    workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
+    members-json: ${{ steps['github-scanner'].outputs['members-json'] }}
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
     postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
 ```
 
 The release tag is immutable. Deloitte can also vendor the self-contained action bundle into its own repository if direct private-repository access isn't available.
+
+When neither `members-json` nor `members-file` is supplied, the action recursively finds one uniquely named `deloitte-github-scanner-output.json`, `github-scanner-output.json`, or `scanner-output.json`. It fails safely when none or multiple are present.
 
 ## Scanner contract
 
@@ -131,7 +154,7 @@ The CLI writes the reconciliation summary to stdout and operational messages to 
 
 ```yaml
 with:
-  workspace-id: ${{ steps.onboard.outputs.workspace-id }}
+  workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
   members-file: scanner-output.json
   postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
   postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
@@ -139,6 +162,18 @@ with:
 ```
 
 Dry run performs role and user lookups but does not provision users or modify workspace access.
+
+## Doctor
+
+The CI-neutral CLI includes a stricter preflight:
+
+```bash
+postman-workspace-access doctor \
+  --workspace-id "${POSTMAN_WORKSPACE_ID}" \
+  --scanner-search-root artifacts
+```
+
+Doctor verifies the target workspace, Postman and SCIM credentials, scanner contract, user resolution, and role map. It issues only read-only requests and returns a machine-readable plan.
 
 ## Outputs
 
