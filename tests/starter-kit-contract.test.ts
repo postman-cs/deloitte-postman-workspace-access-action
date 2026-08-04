@@ -27,7 +27,9 @@ describe('Sharooq starter-kit contract', () => {
       required: false,
       type: 'boolean'
     });
-    const action = workflow.jobs.reconcile.steps.at(-1);
+    const action = workflow.jobs.reconcile.steps.find(
+      (step) => step.uses === './.github/actions/deloitte-postman-workspace-access'
+    );
     expect(action?.uses).toBe('./.github/actions/deloitte-postman-workspace-access');
     expect(action?.with?.['dry-run']).toBe('${{ !inputs.apply }}');
   });
@@ -36,7 +38,9 @@ describe('Sharooq starter-kit contract', () => {
     expect(workflow.on.workflow_call.secrets.POSTMAN_API_KEY?.required).toBe(true);
     expect(workflow.on.workflow_call.secrets.POSTMAN_SCIM_API_KEY?.required).toBe(true);
     expect(workflow.on.workflow_call.inputs['scanner-artifact']?.required).toBe(false);
-    expect(workflow.jobs.reconcile.steps.some((step) => step.uses === 'actions/download-artifact@v8')).toBe(true);
+    expect(workflow.jobs.reconcile.steps.some(
+      (step) => step.uses === 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c'
+    )).toBe(true);
   });
 
   it('documents pull-request preview and main-branch apply for Sharooq', () => {

@@ -20,6 +20,9 @@ npm run verify:dist
 - Never log Postman or SCIM API keys.
 - Preserve dry-run as read-only.
 - Preserve doctor mode as GET-only and require both credentials for its preflight.
+- Preserve validate mode as local-only with no credential or network requirement.
 - Auto-discover scanner output only when exactly one recognized file exists; never guess between candidates.
+- Pin external GitHub Actions to full commit SHAs and keep version comments current.
+- Keep live tests manual, sandbox-only, and blocked on explicit disposable-user confirmation.
 - Keep role updates idempotent and retryable.
 - Rebuild and commit `dist/` whenever runtime source changes.

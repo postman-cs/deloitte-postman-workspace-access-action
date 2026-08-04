@@ -10,7 +10,7 @@ This action expects two things from the existing onboarding flow:
 Clone the immutable release and install the complete starter kit into Deloitte's pipeline repository:
 
 ```bash
-git clone --branch v0.2.0 --depth 1 \
+git clone --branch v0.3.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 ./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
@@ -24,6 +24,8 @@ The installer adds:
 .github/workflows/deloitte-postman-workspace-access.yml  # reusable preview/apply workflow
 scripts/deloitte-postman-doctor.sh                  # read-only preflight
 docs/deloitte-postman-workspace-access.md           # Sharooq's runbook
+docs/deloitte-postman-prerequisites.md              # Postman and scanner checklist
+docs/deloitte-postman-sandbox-smoke.md              # controlled tenant test
 ```
 
 It refuses to overwrite an existing installation. Use `--upgrade` only when intentionally replacing starter-kit-owned files.
@@ -36,6 +38,15 @@ Store these in the CI platform's secret manager:
 - `POSTMAN_SCIM_API_KEY` — looks up current users and provisions or invites missing users.
 
 Do not put either key in the scanner output.
+
+Before requesting credentials, validate the scanner output locally with no network access:
+
+```bash
+./scripts/deloitte-postman-doctor.sh validate \
+  --scanner-search-root artifacts
+```
+
+Review `docs/deloitte-postman-prerequisites.md` before connecting a real team or workspace.
 
 ## 2. Produce scanner JSON
 
@@ -62,7 +73,7 @@ Use this when the consumer repository is allowed to run private actions from `po
 ```yaml
 - name: Reconcile Deloitte workspace access
   id: deloitte-access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.2.0
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.3.0
   with:
     workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-json: ${{ steps['github-scanner'].outputs['members-json'] }}
@@ -75,7 +86,7 @@ Use this when the consumer repository is allowed to run private actions from `po
 Use this when Deloitte wants the runnable bundle in the same repository as its pipeline:
 
 ```bash
-git clone --branch v0.2.0 --depth 1 \
+git clone --branch v0.3.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 cd deloitte-postman-workspace-access-action
@@ -135,3 +146,9 @@ For the first connection, use the installed doctor. It additionally verifies tha
 If a user must accept a Postman team invitation before receiving workspace access, the action reports the user as `pending`. Rerun the same step after acceptance; role assignment is idempotent.
 
 Set `fail-on-pending-invites: 'true'` if pending users should block the pipeline. The default is to report them without failing successful onboarding.
+
+The installed reusable workflow adds a human-readable per-user job summary and uploads the complete JSON result as a GitHub Actions artifact.
+
+## 6. Complete the protected sandbox smoke test
+
+Configure the repository's `postman-sandbox` environment with `POSTMAN_SANDBOX_API_KEY` and `POSTMAN_SANDBOX_SCIM_API_KEY`, then follow `docs/deloitte-postman-sandbox-smoke.md`. Run `preview` first. Invitation mode requires the explicit confirmation `INVITE_DISPOSABLE_USER` and an approved disposable mailbox.

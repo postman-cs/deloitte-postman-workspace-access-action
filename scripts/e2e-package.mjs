@@ -30,7 +30,7 @@ try {
       'utf8'
     ));
     assert.equal(installedPackage.name, '@postman-cse/deloitte-workspace-access');
-    assert.equal(installedPackage.version, '0.2.0');
+    assert.equal(installedPackage.version, '0.3.0');
     assert.equal(installedPackage.bin['postman-workspace-access'], 'dist/cli.cjs');
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/action.yml'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/QUICKSTART.md'));
@@ -38,6 +38,9 @@ try {
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/scripts/deloitte-init.sh'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/templates/deloitte-postman-workspace-access.yml'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/docs/SHAROOQ-RUNBOOK.md'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/docs/POSTMAN-PREREQUISITES.md'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/docs/SANDBOX-SMOKE.md'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/SECURITY.md'));
 
     const packagedConsumer = join(directory, 'packaged-consumer');
     await mkdir(packagedConsumer);

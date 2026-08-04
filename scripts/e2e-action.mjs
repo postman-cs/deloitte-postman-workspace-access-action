@@ -15,6 +15,9 @@ import {
 async function runAction(entrypoint, directory, baseUrl, workspaceId, members, options = {}) {
   const outputPath = join(directory, `${options.label ?? workspaceId}-output.txt`);
   const summaryPath = join(directory, `${options.label ?? workspaceId}-summary.md`);
+  const summaryJsonPath = options.writeSummary
+    ? join(directory, `${options.label ?? workspaceId}-summary.json`)
+    : '';
   await writeFile(outputPath, '');
   await writeFile(summaryPath, '');
   const result = await runProcess(process.execPath, [entrypoint], {
@@ -32,13 +35,15 @@ async function runAction(entrypoint, directory, baseUrl, workspaceId, members, o
       'INPUT_POSTMAN-SCIM-API-KEY': SCIM_KEY,
       'INPUT_DRY-RUN': options.dryRun ? 'true' : 'false',
       'INPUT_FAIL-ON-PENDING-INVITES': options.failOnPending ? 'true' : 'false',
-      'INPUT_POSTMAN-BASE-URL': `${baseUrl}/${options.scenario ?? 'action'}`
+      'INPUT_POSTMAN-BASE-URL': `${baseUrl}/${options.scenario ?? 'action'}`,
+      'INPUT_SUMMARY-FILE': summaryJsonPath
     }
   });
   const outputs = await readActionOutputs(outputPath);
   const stepSummary = await readFile(summaryPath, 'utf8');
-  assertSecretsMasked(result, `${JSON.stringify(outputs)}\n${stepSummary}`);
-  return { ...result, outputs, stepSummary };
+  const summaryFile = summaryJsonPath ? await readFile(summaryJsonPath, 'utf8') : '';
+  assertSecretsMasked(result, `${JSON.stringify(outputs)}\n${stepSummary}\n${summaryFile}`);
+  return { ...result, outputs, stepSummary, summaryFile };
 }
 
 const simulator = await startSimulator();
@@ -49,7 +54,7 @@ try {
         { email: 'action.current@example.com', permissions: { admin: true, push: true, pull: true } },
         { email: 'action.new@example.com', permission: 'write', givenName: 'Action', familyName: 'New' }
       ]
-    });
+    }, { writeSummary: true });
     assert.equal(action.code, 0, action.stderr);
     assert.equal(action.outputs['added-count'], '2');
     assert.equal(action.outputs['invited-count'], '1');
@@ -60,6 +65,10 @@ try {
     });
     assert.match(action.stepSummary, /Postman workspace access/);
     assert.match(action.stepSummary, /action\.new@example\.com/);
+    assert.match(action.stepSummary, /\| Outcome \| Count \|/);
+    assert.match(action.stepSummary, /\| User \| Workspace role \| Team lifecycle/);
+    assert.equal(JSON.parse(action.summaryFile).workspaceId, 'workspace-action');
+    assert.equal(action.outputs['summary-file'].endsWith('workspace-action-summary.json'), true);
     assert.equal(simulator.requestsFor('action').filter((request) => request.path.endsWith('/roles')).length, 1);
 
     const pending = await runAction('dist/index.cjs', directory, simulator.baseUrl, 'workspace-action-pending', [

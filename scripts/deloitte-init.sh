@@ -26,8 +26,17 @@ action_root="${consumer_root}/.github/actions/deloitte-postman-workspace-access"
 workflow_path="${consumer_root}/.github/workflows/deloitte-postman-workspace-access.yml"
 doctor_path="${consumer_root}/scripts/deloitte-postman-doctor.sh"
 runbook_path="${consumer_root}/docs/deloitte-postman-workspace-access.md"
+prerequisites_path="${consumer_root}/docs/deloitte-postman-prerequisites.md"
+sandbox_smoke_path="${consumer_root}/docs/deloitte-postman-sandbox-smoke.md"
 
-owned_paths=("${action_root}" "${workflow_path}" "${doctor_path}" "${runbook_path}")
+owned_paths=(
+  "${action_root}"
+  "${workflow_path}"
+  "${doctor_path}"
+  "${runbook_path}"
+  "${prerequisites_path}"
+  "${sandbox_smoke_path}"
+)
 if [[ "${upgrade}" == false ]]; then
   for path in "${owned_paths[@]}"; do
     if [[ -e "${path}" ]]; then
@@ -47,6 +56,8 @@ cp "${source_root}/dist/cli.cjs" "${action_root}/dist/cli.cjs"
 cp "${source_root}/templates/deloitte-postman-workspace-access.yml" "${workflow_path}"
 cp "${source_root}/templates/deloitte-postman-doctor.sh" "${doctor_path}"
 cp "${source_root}/docs/SHAROOQ-RUNBOOK.md" "${runbook_path}"
+cp "${source_root}/docs/POSTMAN-PREREQUISITES.md" "${prerequisites_path}"
+cp "${source_root}/docs/SANDBOX-SMOKE.md" "${sandbox_smoke_path}"
 chmod +x "${action_root}/dist/cli.cjs" "${doctor_path}"
 
 echo "Installed Deloitte Postman workspace access starter kit in ${consumer_root}"

@@ -108,6 +108,24 @@ export interface DoctorReport {
   plan: ReconcileSummary;
 }
 
+export interface ValidationReport {
+  ok: true;
+  scanner: {
+    source: string;
+    uniqueMembers: number;
+    withScimId: number;
+    requiringScimLookup: number;
+  };
+  workspaceRoles: Record<string, number>;
+  members: Array<{
+    email: string;
+    workspaceRole: string;
+    githubPermission?: string;
+    githubLogin?: string;
+    hasScimId: boolean;
+  }>;
+}
+
 export interface ReconcileOptions {
   workspaceId: string;
   members: NormalizedMember[];
