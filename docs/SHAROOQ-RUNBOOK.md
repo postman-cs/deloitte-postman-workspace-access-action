@@ -8,8 +8,10 @@ Add these GitHub Actions secrets to the Deloitte pipeline repository:
 
 - `POSTMAN_API_KEY`
 - `POSTMAN_SCIM_API_KEY`
+- `DELOITTE_NOTIFICATION_WEBHOOK_URL` (optional until Deloitte's mail gateway is ready)
+- `DELOITTE_NOTIFICATION_WEBHOOK_TOKEN` (optional bearer credential)
 
-The installer creates a local action, a reusable workflow, and a doctor command. Do not store either key in a repository variable, scanner artifact, or log.
+The installer creates a local action, a reusable workflow, a notification template, and a doctor command. Do not store credentials in a repository variable, scanner artifact, or log.
 
 Before credentials are available, validate the scanner artifact without network access:
 
@@ -54,6 +56,7 @@ If the scanner uploads an artifact, add this job after the existing onboarding a
     with:
       workspace-id: ${{ needs.onboard.outputs['workspace-id'] }}
       scanner-artifact: ${{ needs['github-scanner'].outputs['artifact-name'] }}
+      postman-workspace-url: ${{ needs.onboard.outputs['workspace-url'] }}
       apply: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       fail-on-pending-invites: false
     secrets: inherit
@@ -61,7 +64,7 @@ If the scanner uploads an artifact, add this job after the existing onboarding a
 
 This gives Sharooq a read-only preview on pull requests and applies the same plan after merge to `main`.
 
-Each run adds a per-user remediation table to the job summary and uploads the complete JSON result as a retained Actions artifact.
+Each run adds a per-user remediation table to the job summary and uploads the reconciliation and rendered-email JSON as a retained Actions artifact. Apply runs send the batch when `DELOITTE_NOTIFICATION_WEBHOOK_URL` is configured; previews render messages with `send: false` but never call the gateway.
 
 If the scanner writes its JSON into the checked-out workspace instead of an artifact, omit `scanner-artifact`. The action will find the file automatically.
 
@@ -87,15 +90,23 @@ Lifecycle values explain what happened to the team user:
 | --- | --- |
 | No scanner output found | Confirm the scanner artifact was downloaded or rename its JSON to one of the recognized filenames. |
 | Multiple scanner outputs found | Remove stale artifacts or pass one exact `members-file` path in a direct action step. |
-| Unknown GitHub permission | Include GitHub's native `permissions` object so the action can use the highest mapped base permission; otherwise add the custom role to `role-map-json` or emit `workspaceRole`. |
+| Unknown GitHub permission | The user receives the `Viewer` baseline. Include native `permissions`, add the custom role to `role-map-json`, or emit `workspaceRole` only when the user should receive stronger access. |
+| No GitHub permission | No intervention is required; the inclusive baseline assigns `Viewer`. Use `default-workspace-role` only if Deloitte approves a different baseline. |
 | Workspace role is unavailable | Confirm the Postman workspace exposes `Admin`, `Editor`, and `Viewer`, or update the role map. |
 | `401` or `403` from Postman | Rotate the affected secret and confirm it belongs to an account authorized for the workspace/team. |
 | Invitation is pending | Ask the user to accept the Postman team invite, then rerun the same job. |
 | One user fails after a batch retry | Use that user's error in the job summary; successful users have already been handled idempotently. |
+| Notification gateway rejects the batch | Review the gateway policy and `.deloitte-postman/notifications.json`; the action fails instead of silently dropping email. |
+
+## Notification operations
+
+The email transport is deliberately owned by Deloitte. The action sends a vendor-neutral JSON batch containing the recipient, subject, plain text, escaped HTML, workspace role, and lifecycle status. The gateway must return `2xx` only after accepting the whole batch.
+
+Use `notification-delivered-count` to confirm gateway acceptance and the mail gateway's own telemetry to confirm final mailbox delivery. The installed `docs/deloitte-postman-notifications.md` contains the complete contract and `docs/deloitte-postman-onboarding-email.md` contains the message template.
 
 ## Upgrade
 
-Run the newer release's installer with `--upgrade`. It overwrites only the four files owned by this starter kit:
+Run the newer release's installer with `--upgrade`. It overwrites only the files owned by this starter kit:
 
 ```bash
 ./scripts/deloitte-init.sh /path/to/deloitte-pipeline --upgrade

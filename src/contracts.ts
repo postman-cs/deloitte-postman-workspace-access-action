@@ -113,7 +113,11 @@ function unwrapMembers(value: unknown): unknown[] {
   throw new Error('Members input must be an array or an object with a members/collaborators array.');
 }
 
-export function parseMembersJson(value: string, roleMap: Record<string, string>): NormalizedMember[] {
+export function parseMembersJson(
+  value: string,
+  roleMap: Record<string, string>,
+  defaultWorkspaceRole?: string
+): NormalizedMember[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(value);
@@ -140,7 +144,8 @@ export function parseMembersJson(value: string, roleMap: Record<string, string>)
     );
     const candidates = permissionCandidates(member);
     const permission = candidates.find((candidate) => roleMap[candidate]);
-    const workspaceRole = explicitRole ?? (permission ? roleMap[permission] : undefined);
+    const fallbackRole = optionalString(defaultWorkspaceRole);
+    const workspaceRole = explicitRole ?? (permission ? roleMap[permission] : undefined) ?? fallbackRole;
     if (!workspaceRole) {
       throw new Error(
         `Member ${email} has no Postman workspace role and its GitHub permission is not present in role-map-json.`
@@ -157,7 +162,7 @@ export function parseMembersJson(value: string, roleMap: Record<string, string>)
       email,
       workspaceRole,
       ...(githubLogin ? { githubLogin } : {}),
-      ...(permission ? { githubPermission: permission } : {}),
+      ...(permission ?? candidates[0] ? { githubPermission: permission ?? candidates[0] } : {}),
       ...(scimId ? { scimId } : {}),
       ...(externalId ? { externalId } : {}),
       ...(givenName ? { givenName } : {}),

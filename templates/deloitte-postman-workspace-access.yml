@@ -27,6 +27,21 @@ on:
         required: false
         default: false
         type: boolean
+      default-workspace-role:
+        description: Fallback Postman role for any detected collaborator without a mapped permission.
+        required: false
+        default: Viewer
+        type: string
+      postman-workspace-url:
+        description: User-facing URL placed in Deloitte onboarding emails.
+        required: false
+        default: https://go.postman.co/
+        type: string
+      notification-subject:
+        description: Subject line used by Deloitte's mail gateway.
+        required: false
+        default: 'Deloitte: Your Postman workspace access'
+        type: string
       artifact-retention-days:
         description: Number of days to retain the machine-readable reconciliation summary.
         required: false
@@ -37,6 +52,10 @@ on:
         required: true
       POSTMAN_SCIM_API_KEY:
         required: true
+      DELOITTE_NOTIFICATION_WEBHOOK_URL:
+        required: false
+      DELOITTE_NOTIFICATION_WEBHOOK_TOKEN:
+        required: false
     outputs:
       summary-json:
         description: Machine-readable reconciliation summary.
@@ -50,6 +69,12 @@ on:
       summary-artifact:
         description: Name of the uploaded reconciliation-summary artifact.
         value: ${{ jobs.reconcile.outputs['summary-artifact'] }}
+      notification-count:
+        description: Number of onboarding messages rendered for detected collaborators.
+        value: ${{ jobs.reconcile.outputs['notification-count'] }}
+      notification-delivered-count:
+        description: Number of onboarding messages accepted by Deloitte's mail gateway.
+        value: ${{ jobs.reconcile.outputs['notification-delivered-count'] }}
 
 permissions:
   contents: read
@@ -63,6 +88,8 @@ jobs:
       pending-count: ${{ steps.access.outputs['pending-count'] }}
       failed-count: ${{ steps.access.outputs['failed-count'] }}
       summary-artifact: ${{ steps.artifact_name.outputs.name }}
+      notification-count: ${{ steps.access.outputs['notification-count'] }}
+      notification-delivered-count: ${{ steps.access.outputs['notification-delivered-count'] }}
     steps:
       - name: Check out pipeline repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,9 +109,15 @@ jobs:
           scanner-search-root: ${{ inputs['scanner-search-root'] }}
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
           postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
+          default-workspace-role: ${{ inputs['default-workspace-role'] }}
+          postman-workspace-url: ${{ inputs['postman-workspace-url'] }}
+          notification-subject: ${{ inputs['notification-subject'] }}
+          notification-webhook-url: ${{ secrets.DELOITTE_NOTIFICATION_WEBHOOK_URL }}
+          notification-webhook-token: ${{ secrets.DELOITTE_NOTIFICATION_WEBHOOK_TOKEN }}
           dry-run: ${{ !inputs.apply }}
           fail-on-pending-invites: ${{ inputs['fail-on-pending-invites'] }}
           summary-file: .deloitte-postman/summary.json
+          notifications-file: .deloitte-postman/notifications.json
 
       - name: Name summary artifact
         id: artifact_name
@@ -97,6 +130,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.artifact_name.outputs.name }}
-          path: .deloitte-postman/summary.json
+          path: .deloitte-postman/
           retention-days: ${{ inputs['artifact-retention-days'] }}
           if-no-files-found: error

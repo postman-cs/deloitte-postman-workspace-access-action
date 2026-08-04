@@ -1,5 +1,5 @@
 name: 'Deloitte: Postman Workspace Access'
-description: Provision missing Postman team users and reconcile GitHub collaborators into workspace roles.
+description: Onboard detected GitHub collaborators into Postman and render Deloitte usage notifications.
 author: Postman
 branding:
   icon: users
@@ -22,6 +22,10 @@ inputs:
     description: JSON overrides or extensions mapping GitHub permission names to Postman workspace role display names.
     required: false
     default: '{"admin":"Admin","maintain":"Editor","write":"Editor","push":"Editor","triage":"Viewer","read":"Viewer","pull":"Viewer"}'
+  default-workspace-role:
+    description: Inclusive fallback role assigned to detected collaborators with no explicit or mapped GitHub permission.
+    required: false
+    default: Viewer
   postman-api-key:
     description: Postman API key authorized to manage roles on the target workspace.
     required: true
@@ -43,6 +47,26 @@ inputs:
   summary-file:
     description: Optional path where the complete JSON reconciliation summary is written for artifact upload.
     required: false
+  postman-workspace-url:
+    description: Workspace link placed in each rendered onboarding email. Defaults to the Postman home page.
+    required: false
+    default: https://go.postman.co/
+  source-repository:
+    description: Repository name shown in onboarding emails. Defaults to the current GitHub repository.
+    required: false
+  notification-subject:
+    description: Subject line for rendered onboarding emails.
+    required: false
+    default: 'Deloitte: Your Postman workspace access'
+  notifications-file:
+    description: Optional path where rendered plain-text and HTML onboarding emails are written as JSON.
+    required: false
+  notification-webhook-url:
+    description: Optional HTTPS Deloitte mail-gateway endpoint that accepts a batch of rendered onboarding emails.
+    required: false
+  notification-webhook-token:
+    description: Optional bearer token used only with the Deloitte notification webhook.
+    required: false
 outputs:
   summary-json:
     description: Machine-readable reconciliation summary.
@@ -60,6 +84,14 @@ outputs:
     description: Inline JSON or the resolved absolute scanner-output path used by the action.
   summary-file:
     description: Absolute path to the JSON summary file when summary-file is configured.
+  notification-count:
+    description: Number of onboarding email messages rendered from scanner results.
+  notification-eligible-count:
+    description: Number of rendered messages eligible for delivery (zero during dry-run previews).
+  notification-delivered-count:
+    description: Number of onboarding messages accepted by the configured notification gateway.
+  notifications-file:
+    description: Absolute path to the rendered onboarding-email JSON file when configured.
 runs:
   using: node24
   main: dist/index.cjs

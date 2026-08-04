@@ -16,7 +16,9 @@ try {
     access(join(installed, 'action.yml')),
     access(join(installed, 'dist/index.cjs')),
     access(join(installed, 'LICENSE')),
-    access(join(installed, 'README.md'))
+    access(join(installed, 'README.md')),
+    access(join(installed, 'docs/NOTIFICATIONS.md')),
+    access(join(installed, 'templates/deloitte-postman-onboarding-email.md'))
   ]);
 
   const second = spawnSync('bash', ['scripts/vendor-action.sh', target], {

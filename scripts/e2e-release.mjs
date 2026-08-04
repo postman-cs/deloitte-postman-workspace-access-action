@@ -52,6 +52,7 @@ await withTempDir('deloitte-release-e2e-', async (directory) => {
   const archive = await runProcess('tar', ['-tzf', join(directory, starterKit)]);
   assert.equal(archive.code, 0, archive.stderr);
   assert.match(archive.stdout, /scripts\/deloitte-init\.sh/);
+  assert.match(archive.stdout, /scripts\/vendor-action\.sh/);
   assert.match(archive.stdout, /README\.md/);
   assert.match(archive.stdout, /BUILD_LOG\.md/);
   assert.match(archive.stdout, /docs\/POSTMAN-PREREQUISITES\.md/);

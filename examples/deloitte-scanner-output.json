@@ -36,6 +36,12 @@
         "pull": true
       },
       "externalId": "github-1004"
+    },
+    {
+      "login": "unmapped-specialist",
+      "email": "unmapped.specialist@example.com",
+      "role_name": "deloitte-specialist",
+      "externalId": "github-1005"
     }
   ]
 }

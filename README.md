@@ -6,7 +6,8 @@ Plug-and-play workspace membership for API onboarding pipelines. Feed the action
 2. Resolve current Postman team members by SCIM ID or email.
 3. Provision or invite users who are not current team members.
 4. Assign the resolved users to the onboarded workspace.
-5. Return a machine-readable summary for later pipeline steps.
+5. Render a Deloitte onboarding email for every detected collaborator and optionally deliver the batch through Deloitte's approved mail gateway.
+6. Return machine-readable reconciliation and notification artifacts for later pipeline steps.
 
 The implementation uses the public Postman [SCIM create-user API](https://learning.postman.com/api-docs/api-reference/scim/create-scim-user) and [workspace-role API](https://learning.postman.com/api-docs/api-reference/workspaces/update-workspace-roles). Workspace role updates use SCIM IDs, so the scanner never needs to know Postman-internal user IDs.
 
@@ -15,14 +16,14 @@ For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). Sharooq's one
 ## Sharooq's golden path
 
 ```bash
-git clone --branch v0.3.1 --depth 1 \
+git clone --branch v0.4.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 ./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
   /path/to/deloitte-pipeline
 ```
 
-Then set `POSTMAN_API_KEY` and `POSTMAN_SCIM_API_KEY` as GitHub Actions secrets and run the installed read-only preflight:
+Then set `POSTMAN_API_KEY` and `POSTMAN_SCIM_API_KEY` as GitHub Actions secrets. To send an explicit email to every detected collaborator, also set `DELOITTE_NOTIFICATION_WEBHOOK_URL` and, when required by the gateway, `DELOITTE_NOTIFICATION_WEBHOOK_TOKEN`. Run the installed read-only preflight:
 
 ```bash
 cd /path/to/deloitte-pipeline
@@ -56,12 +57,15 @@ Validation checks emails and permission mapping, normalizes duplicate emails, an
 
 - name: Reconcile workspace access
   id: access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.3.1
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.4.0
   with:
     workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-json: ${{ steps['github-scanner'].outputs['members-json'] }}
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
     postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
+    postman-workspace-url: ${{ steps.onboard.outputs['workspace-url'] }}
+    notification-webhook-url: ${{ secrets.DELOITTE_NOTIFICATION_WEBHOOK_URL }}
+    notification-webhook-token: ${{ secrets.DELOITTE_NOTIFICATION_WEBHOOK_TOKEN }}
 ```
 
 The release tag is immutable. Deloitte can also vendor the self-contained action bundle into its own repository if direct private-repository access isn't available.
@@ -104,7 +108,6 @@ The scanner can emit a bare array, `{ "members": [...] }`, or `{ "collaborators"
 Required per user:
 
 - `email`
-- A GitHub permission (`githubPermission`, `permission`, `role_name`, `role`, or a GitHub `permissions` object), unless `workspaceRole`/`postmanRole` is supplied directly.
 
 Optional fields:
 
@@ -122,8 +125,9 @@ Duplicate emails are collapsed case-insensitively and the strongest requested ro
 | `admin` | Admin |
 | `maintain`, `write`, `push` | Editor |
 | `triage`, `read`, `pull` | Viewer |
+| Unmapped or missing permission | Viewer |
 
-GitHub custom repository roles are supported without dropping collaborators. If `role_name` has an explicit entry in `role-map-json`, that mapping wins. Otherwise the action examines every `true` value in GitHub's native `permissions` object and uses the highest mapped base permission. Postman receives one effective workspace role per user, as required by the workspace-role API.
+GitHub custom repository roles are supported without dropping collaborators. If `role_name` has an explicit entry in `role-map-json`, that mapping wins. Otherwise the action examines every `true` value in GitHub's native `permissions` object and uses the highest mapped base permission. If no mapped permission is available, the inclusive `default-workspace-role` baseline assigns `Viewer`. Postman receives one effective workspace role per user, as required by the workspace-role API.
 
 Extend or override individual mappings with `role-map-json`; omitted standard permissions keep their defaults:
 
@@ -146,6 +150,18 @@ The action resolves Postman's current role IDs dynamically from `GET /workspace-
 
 The workspace-role API is idempotent, so the step can run on every onboarding execution.
 
+## Guaranteed notification handoff
+
+Postman's native email behavior differs by lifecycle, so this action also renders a consistent Deloitte onboarding message for every unique scanner email. The message explains why the user was onboarded, their workspace role, their next step, the workspace link, and practical ways to start using Postman.
+
+- `notifications-file` writes the complete plain-text and HTML email batch for audit or downstream delivery.
+- `notification-webhook-url` sends the eligible batch to Deloitte's approved HTTPS mail gateway.
+- `notification-webhook-token` supplies an optional bearer token and is always masked.
+- Dry runs render preview messages with `send: false` and never call the gateway.
+- Configured gateway rejection fails the action; transient responses are retried with an idempotency key.
+
+See [the notification gateway contract](docs/NOTIFICATIONS.md) and [the human-readable email template](templates/deloitte-postman-onboarding-email.md). The action confirms gateway acceptance, not downstream mailbox delivery; Deloitte's gateway remains responsible for domain policy, final sending, and delivery telemetry.
+
 ## Generic CI / CLI
 
 The bundle also exposes a CI-neutral executable:
@@ -153,10 +169,14 @@ The bundle also exposes a CI-neutral executable:
 ```bash
 export POSTMAN_API_KEY="${POSTMAN_API_KEY}"
 export POSTMAN_SCIM_API_KEY="${POSTMAN_SCIM_API_KEY}"
+export DELOITTE_NOTIFICATION_WEBHOOK_URL="${DELOITTE_NOTIFICATION_WEBHOOK_URL}"
+export DELOITTE_NOTIFICATION_WEBHOOK_TOKEN="${DELOITTE_NOTIFICATION_WEBHOOK_TOKEN}"
 
 npx --yes github:postman-cs/deloitte-postman-workspace-access-action \
   --workspace-id "${POSTMAN_WORKSPACE_ID}" \
-  --members-file scanner-output.json
+  --members-file scanner-output.json \
+  --postman-workspace-url "${POSTMAN_WORKSPACE_URL}" \
+  --notifications-file .deloitte-postman/notifications.json
 ```
 
 The CLI writes the reconciliation summary to stdout and operational messages to stderr. Exit code `1` indicates failed entries. With `--fail-on-pending-invites`, exit code `2` indicates pending invitations.
@@ -198,6 +218,10 @@ See [Postman prerequisites](docs/POSTMAN-PREREQUISITES.md) for the plan, service
 - `failed-count` — Entries that failed.
 - `scanner-source` — The exact scanner input selected by discovery.
 - `summary-file` — The JSON report path when `summary-file` is configured.
+- `notification-count` — Messages rendered for detected collaborators.
+- `notification-eligible-count` — Messages eligible for delivery; previews are excluded.
+- `notification-delivered-count` — Messages accepted by the configured Deloitte gateway.
+- `notifications-file` — The rendered plain-text and HTML email batch.
 
 The reusable workflow always uploads the JSON report as a retained GitHub Actions artifact. Its job summary shows outcome counts and a per-user remediation table.
 
@@ -221,8 +245,10 @@ This allows an internal maintainer to download and securely transfer the starter
 
 - `POSTMAN_API_KEY` / `postman-api-key`: must be allowed to view available workspace roles and manage the target workspace.
 - `POSTMAN_SCIM_API_KEY` / `postman-scim-api-key`: required only when the scanner doesn't supply SCIM IDs and the action must look up or provision users.
+- `DELOITTE_NOTIFICATION_WEBHOOK_URL` / `notification-webhook-url`: optional approved HTTPS mail-gateway endpoint.
+- `DELOITTE_NOTIFICATION_WEBHOOK_TOKEN` / `notification-webhook-token`: optional bearer credential for that endpoint.
 
-Never put either credential in scanner output, repository variables, artifacts, or logs. Store them in the CI platform's secret manager.
+Never put any credential in scanner output, repository variables, artifacts, or logs. Store them in the CI platform's secret manager.
 
 ## Local development
 

@@ -93,6 +93,37 @@ export interface ReconcileSummary {
   };
 }
 
+export type NotificationStatus = 'ready' | 'invitation-pending' | 'preview' | 'needs-attention';
+
+export interface OnboardingNotification {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  workspaceRole: string;
+  lifecycle: UserLifecycle;
+  workspaceAccess: WorkspaceAccess;
+  status: NotificationStatus;
+  send: boolean;
+}
+
+export interface NotificationEnvelope {
+  schemaVersion: 1;
+  kind: 'deloitte-postman-onboarding';
+  workspace: {
+    id: string;
+    url: string;
+  };
+  sourceRepository?: string;
+  notifications: OnboardingNotification[];
+}
+
+export interface NotificationOptions {
+  workspaceUrl?: string;
+  sourceRepository?: string;
+  subject?: string;
+}
+
 export interface DoctorReport {
   ok: boolean;
   workspace: WorkspaceIdentity;

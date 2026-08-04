@@ -61,6 +61,7 @@ try {
   }
   await mkdir(join(bundleRoot, 'scripts'));
   await cp(join(repositoryRoot, 'scripts/deloitte-init.sh'), join(bundleRoot, 'scripts/deloitte-init.sh'));
+  await cp(join(repositoryRoot, 'scripts/vendor-action.sh'), join(bundleRoot, 'scripts/vendor-action.sh'));
 
   const archiveName = `${bundleName}.tar.gz`;
   run('tar', ['-czf', join(output, archiveName), '-C', temporaryRoot, bundleName]);

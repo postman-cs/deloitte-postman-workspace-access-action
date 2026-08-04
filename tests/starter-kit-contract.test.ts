@@ -38,9 +38,21 @@ describe('Sharooq starter-kit contract', () => {
     expect(workflow.on.workflow_call.secrets.POSTMAN_API_KEY?.required).toBe(true);
     expect(workflow.on.workflow_call.secrets.POSTMAN_SCIM_API_KEY?.required).toBe(true);
     expect(workflow.on.workflow_call.inputs['scanner-artifact']?.required).toBe(false);
+    expect(workflow.on.workflow_call.inputs['default-workspace-role']?.default).toBe('Viewer');
+    expect(workflow.on.workflow_call.secrets.DELOITTE_NOTIFICATION_WEBHOOK_URL?.required).toBe(false);
+    expect(workflow.on.workflow_call.secrets.DELOITTE_NOTIFICATION_WEBHOOK_TOKEN?.required).toBe(false);
     expect(workflow.jobs.reconcile.steps.some(
       (step) => step.uses === 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c'
     )).toBe(true);
+  });
+
+  it('renders and routes Deloitte onboarding notifications', () => {
+    const action = workflow.jobs.reconcile.steps.find(
+      (step) => step.uses === './.github/actions/deloitte-postman-workspace-access'
+    );
+    expect(action?.with?.['notification-webhook-url']).toBe('${{ secrets.DELOITTE_NOTIFICATION_WEBHOOK_URL }}');
+    expect(action?.with?.['notifications-file']).toBe('.deloitte-postman/notifications.json');
+    expect(source).toContain('notification-delivered-count');
   });
 
   it('documents pull-request preview and main-branch apply for Sharooq', () => {

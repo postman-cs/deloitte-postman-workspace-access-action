@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
   POSTMAN_KEY,
   SCIM_KEY,
+  NOTIFICATION_TOKEN,
   assertSecretsMasked,
   runProcess,
   startSimulator,
@@ -25,12 +26,21 @@ function runCli(baseUrl, workspaceId, members, options = {}) {
   if (options.scannerSearchRoot) args.push('--scanner-search-root', options.scannerSearchRoot);
   args.push('--postman-base-url', `${baseUrl}/${options.scenario ?? workspaceId}`);
   if (options.roleMap) args.push('--role-map-json', JSON.stringify(options.roleMap));
+  if (options.defaultWorkspaceRole) args.push('--default-workspace-role', options.defaultWorkspaceRole);
+  if (options.workspaceUrl) args.push('--postman-workspace-url', options.workspaceUrl);
+  if (options.notificationsFile) args.push('--notifications-file', options.notificationsFile);
   if (options.dryRun) args.push('--dry-run');
   if (options.failOnPending) args.push('--fail-on-pending-invites');
   return runProcess(process.execPath, args, {
     env: {
       POSTMAN_API_KEY: options.postmanKey ?? POSTMAN_KEY,
-      POSTMAN_SCIM_API_KEY: options.scimKey === null ? '' : options.scimKey ?? SCIM_KEY
+      POSTMAN_SCIM_API_KEY: options.scimKey === null ? '' : options.scimKey ?? SCIM_KEY,
+      GITHUB_REPOSITORY: 'deloitte/arbiter',
+      GITHUB_RUN_ID: '424242',
+      DELOITTE_NOTIFICATION_WEBHOOK_URL: options.notificationScenario
+        ? `${baseUrl}/${options.notificationScenario}/email-batches`
+        : '',
+      DELOITTE_NOTIFICATION_WEBHOOK_TOKEN: options.notificationScenario ? NOTIFICATION_TOKEN : ''
     }
   });
 }
@@ -58,11 +68,15 @@ try {
       ]
     };
     const membersFile = join(directory, 'scanner-output.json');
+    const notificationsFile = join(directory, 'notifications.json');
     await writeJson(membersFile, successMembers);
     const success = await runCli(simulator.baseUrl, 'workspace-success', successMembers, {
       scenario: 'success',
       membersFile,
-      roleMap: { admin: 'Admin', write: 'Editor', read: 'Viewer', contribute: 'Editor' }
+      roleMap: { admin: 'Admin', write: 'Editor', read: 'Viewer', contribute: 'Editor' },
+      notificationScenario: 'notification-cli',
+      notificationsFile,
+      workspaceUrl: 'https://go.postman.co/workspace/arbiter'
     });
     assert.equal(success.code, 0, success.stderr);
     assertSecretsMasked(success);
@@ -80,6 +94,11 @@ try {
     assert.equal(successSummary.results.find((item) => item.email === 'race.user@example.com').lifecycle, 'existing');
     assert.equal(successSummary.results.find((item) => item.email === 'provided.viewer@example.com').lifecycle, 'provided-scim-id');
     assert.equal(successSummary.results.find((item) => item.email === 'custom.fallback@example.com').workspaceRole, 'Editor');
+    const notificationEnvelope = JSON.parse(await readFile(notificationsFile, 'utf8'));
+    assert.equal(notificationEnvelope.notifications.length, 7);
+    assert.equal(notificationEnvelope.sourceRepository, 'deloitte/arbiter');
+    assert.equal(simulator.requestsFor('notification-cli')[0].body.notifications.length, 7);
+    assert.equal(simulator.requestsFor('notification-cli')[0].idempotencyKey, 'deloitte-postman:workspace-success:424242');
 
     const successRequests = simulator.requestsFor('success');
     assert.equal(successRequests.filter((request) => request.method === 'POST').length, 2);

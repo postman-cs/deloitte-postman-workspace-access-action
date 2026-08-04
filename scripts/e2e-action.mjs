@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   POSTMAN_KEY,
   SCIM_KEY,
+  NOTIFICATION_TOKEN,
   assertSecretsMasked,
   readActionOutputs,
   runProcess,
@@ -18,6 +19,9 @@ async function runAction(entrypoint, directory, baseUrl, workspaceId, members, o
   const summaryJsonPath = options.writeSummary
     ? join(directory, `${options.label ?? workspaceId}-summary.json`)
     : '';
+  const notificationsJsonPath = options.writeNotifications
+    ? join(directory, `${options.label ?? workspaceId}-notifications.json`)
+    : '';
   await writeFile(outputPath, '');
   await writeFile(summaryPath, '');
   const result = await runProcess(process.execPath, [entrypoint], {
@@ -26,24 +30,36 @@ async function runAction(entrypoint, directory, baseUrl, workspaceId, members, o
       GITHUB_ACTIONS: 'true',
       GITHUB_OUTPUT: outputPath,
       GITHUB_STEP_SUMMARY: summaryPath,
+      GITHUB_REPOSITORY: 'deloitte/api-platform',
+      GITHUB_RUN_ID: '8675309',
+      GITHUB_RUN_ATTEMPT: '1',
       'INPUT_WORKSPACE-ID': workspaceId,
       'INPUT_MEMBERS-JSON': options.autoDiscover ? '' : JSON.stringify(members),
       'INPUT_MEMBERS-FILE': '',
       'INPUT_SCANNER-SEARCH-ROOT': options.scannerSearchRoot ?? '',
       'INPUT_ROLE-MAP-JSON': options.roleMap ? JSON.stringify(options.roleMap) : '',
+      'INPUT_DEFAULT-WORKSPACE-ROLE': options.defaultWorkspaceRole ?? '',
       'INPUT_POSTMAN-API-KEY': POSTMAN_KEY,
       'INPUT_POSTMAN-SCIM-API-KEY': SCIM_KEY,
       'INPUT_DRY-RUN': options.dryRun ? 'true' : 'false',
       'INPUT_FAIL-ON-PENDING-INVITES': options.failOnPending ? 'true' : 'false',
       'INPUT_POSTMAN-BASE-URL': `${baseUrl}/${options.scenario ?? 'action'}`,
-      'INPUT_SUMMARY-FILE': summaryJsonPath
+      'INPUT_SUMMARY-FILE': summaryJsonPath,
+      'INPUT_POSTMAN-WORKSPACE-URL': options.workspaceUrl ?? '',
+      'INPUT_NOTIFICATION-SUBJECT': options.notificationSubject ?? '',
+      'INPUT_NOTIFICATIONS-FILE': notificationsJsonPath,
+      'INPUT_NOTIFICATION-WEBHOOK-URL': options.notificationScenario
+        ? `${baseUrl}/${options.notificationScenario}/email-batches`
+        : '',
+      'INPUT_NOTIFICATION-WEBHOOK-TOKEN': options.notificationScenario ? NOTIFICATION_TOKEN : ''
     }
   });
   const outputs = await readActionOutputs(outputPath);
   const stepSummary = await readFile(summaryPath, 'utf8');
   const summaryFile = summaryJsonPath ? await readFile(summaryJsonPath, 'utf8') : '';
-  assertSecretsMasked(result, `${JSON.stringify(outputs)}\n${stepSummary}\n${summaryFile}`);
-  return { ...result, outputs, stepSummary, summaryFile };
+  const notificationsFile = notificationsJsonPath ? await readFile(notificationsJsonPath, 'utf8') : '';
+  assertSecretsMasked(result, `${JSON.stringify(outputs)}\n${stepSummary}\n${summaryFile}\n${notificationsFile}`);
+  return { ...result, outputs, stepSummary, summaryFile, notificationsFile };
 }
 
 const simulator = await startSimulator();
@@ -52,16 +68,22 @@ try {
     const action = await runAction('dist/index.cjs', directory, simulator.baseUrl, 'workspace-action', {
       collaborators: [
         { email: 'action.current@example.com', permissions: { admin: true, push: true, pull: true } },
-        { email: 'action.new@example.com', permission: 'write', givenName: 'Action', familyName: 'New' }
+        { email: 'action.new@example.com', permission: 'write', givenName: 'Action', familyName: 'New' },
+        { email: 'action.specialist@example.com', role_name: 'deloitte-api-specialist' }
       ]
-    }, { writeSummary: true });
+    }, {
+      writeSummary: true,
+      writeNotifications: true,
+      notificationScenario: 'notification-action',
+      workspaceUrl: 'https://go.postman.co/workspace/deloitte-api-platform'
+    });
     assert.equal(action.code, 0, action.stderr);
-    assert.equal(action.outputs['added-count'], '2');
-    assert.equal(action.outputs['invited-count'], '1');
+    assert.equal(action.outputs['added-count'], '3');
+    assert.equal(action.outputs['invited-count'], '2');
     assert.equal(action.outputs['pending-count'], '0');
     assert.equal(action.outputs['failed-count'], '0');
     assert.deepEqual(JSON.parse(action.outputs['summary-json']).counts, {
-      added: 2, invited: 1, pending: 0, skipped: 0, failed: 0
+      added: 3, invited: 2, pending: 0, skipped: 0, failed: 0
     });
     assert.match(action.stepSummary, /Postman workspace access/);
     assert.match(action.stepSummary, /action\.new@example\.com/);
@@ -69,22 +91,71 @@ try {
     assert.match(action.stepSummary, /\| User \| Workspace role \| Team lifecycle/);
     assert.equal(JSON.parse(action.summaryFile).workspaceId, 'workspace-action');
     assert.equal(action.outputs['summary-file'].endsWith('workspace-action-summary.json'), true);
+    assert.equal(action.outputs['notification-count'], '3');
+    assert.equal(action.outputs['notification-eligible-count'], '3');
+    assert.equal(action.outputs['notification-delivered-count'], '3');
+    assert.equal(action.outputs['notifications-file'].endsWith('workspace-action-notifications.json'), true);
+    const renderedNotifications = JSON.parse(action.notificationsFile);
+    assert.equal(renderedNotifications.notifications.length, 3);
+    assert.equal(
+      renderedNotifications.notifications.find(({ to }) => to === 'action.specialist@example.com').workspaceRole,
+      'Viewer'
+    );
     assert.equal(simulator.requestsFor('action').filter((request) => request.path.endsWith('/roles')).length, 1);
+    const notificationRequest = simulator.requestsFor('notification-action')[0];
+    assert(notificationRequest);
+    assert.equal(notificationRequest.idempotencyKey, 'deloitte-postman:workspace-action:8675309:1');
+    assert.equal(notificationRequest.body.notifications.length, 3);
+    assert.match(notificationRequest.body.notifications[0].text, /Three useful ways to get started/);
 
     const pending = await runAction('dist/index.cjs', directory, simulator.baseUrl, 'workspace-action-pending', [
       { email: 'action.pending@example.com', permission: 'read' }
-    ], { label: 'pending', scenario: 'pending', failOnPending: true });
+    ], {
+      label: 'pending',
+      scenario: 'pending',
+      failOnPending: true,
+      notificationScenario: 'notification-pending'
+    });
     assert.equal(pending.code, 1);
     assert.equal(pending.outputs['pending-count'], '1');
     assert.equal(pending.outputs['failed-count'], '0');
+    assert.equal(pending.outputs['notification-delivered-count'], '1');
+    assert.equal(simulator.requestsFor('notification-pending')[0].body.notifications[0].status, 'invitation-pending');
     assert.match(pending.stdout, /invited user\(s\) are pending/);
 
     const dryRun = await runAction('dist/index.cjs', directory, simulator.baseUrl, 'workspace-action-dryrun', [
       { email: 'action.dryrun@example.com', permission: 'read' }
-    ], { label: 'dryrun', scenario: 'action-dryrun', dryRun: true });
+    ], {
+      label: 'dryrun',
+      scenario: 'action-dryrun',
+      dryRun: true,
+      writeNotifications: true,
+      notificationScenario: 'notification-dryrun'
+    });
     assert.equal(dryRun.code, 0, dryRun.stderr);
     assert.equal(dryRun.outputs['skipped-count'], '1');
+    assert.equal(dryRun.outputs['notification-count'], '1');
+    assert.equal(dryRun.outputs['notification-eligible-count'], '0');
+    assert.equal(dryRun.outputs['notification-delivered-count'], '0');
+    assert.equal(JSON.parse(dryRun.notificationsFile).notifications[0].send, false);
     assert.equal(simulator.requestsFor('action-dryrun').some((request) => ['POST', 'PATCH'].includes(request.method)), false);
+    assert.equal(simulator.requestsFor('notification-dryrun').length, 0);
+
+    const rejectedNotification = await runAction(
+      'dist/index.cjs',
+      directory,
+      simulator.baseUrl,
+      'workspace-notification-rejected',
+      [{ email: 'action.current@example.com', permission: 'read' }],
+      {
+        label: 'notification-rejected',
+        scenario: 'action-notification-rejected',
+        notificationScenario: 'notification-rejected'
+      }
+    );
+    assert.equal(rejectedNotification.code, 1);
+    assert.equal(rejectedNotification.outputs['added-count'], '1');
+    assert.match(rejectedNotification.stdout, /Notification gateway returned HTTP 400/);
 
     const discoveryRoot = join(directory, 'scanner-artifact');
     await mkdir(discoveryRoot);

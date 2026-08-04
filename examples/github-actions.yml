@@ -18,14 +18,23 @@ jobs:
       # Replace this fixture with the file or JSON output from Deloitte's scanner.
       - name: Reconcile workspace access
         id: access
-        uses: postman-cs/deloitte-postman-workspace-access-action@v0.3.1
+        uses: postman-cs/deloitte-postman-workspace-access-action@v0.4.0
         with:
           workspace-id: ${{ inputs.workspace_id }}
           members-file: examples/deloitte-scanner-output.json
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
           postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
+          postman-workspace-url: https://go.postman.co/
+          notifications-file: .deloitte-postman/notifications.json
+          notification-webhook-url: ${{ secrets.DELOITTE_NOTIFICATION_WEBHOOK_URL }}
+          notification-webhook-token: ${{ secrets.DELOITTE_NOTIFICATION_WEBHOOK_TOKEN }}
 
       - name: Surface pending invitations
         if: ${{ steps.access.outputs['pending-count'] != '0' }}
         run: |
           echo "${{ steps.access.outputs['pending-count'] }} user invitation(s) are pending."
+
+      - name: Confirm notification handoff
+        if: ${{ steps.access.outputs['notification-delivered-count'] != '0' }}
+        run: |
+          echo "${{ steps.access.outputs['notification-delivered-count'] }} onboarding email(s) were accepted by Deloitte's gateway."

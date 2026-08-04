@@ -3,6 +3,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 import { parseBoolean } from './contracts.js';
+import {
+  buildNotificationEnvelope,
+  deliverNotificationEnvelope,
+  validateNotificationConfiguration,
+  writeNotificationEnvelope
+} from './notifications.js';
 import { PostmanClient } from './postman-client.js';
 import { reconcileWorkspaceAccess } from './reconcile.js';
 import { formatMarkdownSummary, formatSummary, resolveMembersInput } from './runtime.js';
@@ -17,14 +23,25 @@ export async function runAction(): Promise<void> {
     const workspaceId = core.getInput('workspace-id', { required: true }).trim();
     const postmanApiKey = core.getInput('postman-api-key', { required: true }).trim();
     const scimApiKey = optionalInput('postman-scim-api-key');
+    const notificationWebhookUrl = optionalInput('notification-webhook-url');
+    const notificationWebhookToken = optionalInput('notification-webhook-token');
+    const workspaceUrl = optionalInput('postman-workspace-url');
+    const notificationSubject = optionalInput('notification-subject');
     core.setSecret(postmanApiKey);
     if (scimApiKey) core.setSecret(scimApiKey);
+    if (notificationWebhookUrl) core.setSecret(notificationWebhookUrl);
+    if (notificationWebhookToken) core.setSecret(notificationWebhookToken);
+    validateNotificationConfiguration({
+      ...(workspaceUrl ? { workspaceUrl } : {}),
+      ...(notificationSubject ? { subject: notificationSubject } : {})
+    }, notificationWebhookUrl);
 
     const resolved = await resolveMembersInput(
       optionalInput('members-json'),
       optionalInput('members-file'),
       optionalInput('role-map-json'),
-      optionalInput('scanner-search-root')
+      optionalInput('scanner-search-root'),
+      optionalInput('default-workspace-role') ?? 'Viewer'
     );
     if (resolved.discovered) core.info(`Auto-discovered scanner output at ${resolved.source}.`);
     const dryRun = parseBoolean(optionalInput('dry-run'));
@@ -60,6 +77,36 @@ export async function runAction(): Promise<void> {
       core.setOutput('summary-file', summaryPath);
     }
     await core.summary.addRaw(formatMarkdownSummary(summary)).write();
+
+    const sourceRepository = optionalInput('source-repository') ?? process.env.GITHUB_REPOSITORY;
+    const notificationEnvelope = buildNotificationEnvelope(summary, {
+      ...(workspaceUrl ? { workspaceUrl } : {}),
+      ...(sourceRepository ? { sourceRepository } : {}),
+      ...(notificationSubject ? { subject: notificationSubject } : {})
+    });
+    const notificationCount = notificationEnvelope.notifications.length;
+    const eligibleNotificationCount = notificationEnvelope.notifications.filter(({ send }) => send).length;
+    core.setOutput('notification-count', String(notificationCount));
+    core.setOutput('notification-eligible-count', String(eligibleNotificationCount));
+    core.setOutput('notification-delivered-count', '0');
+    const notificationsFile = optionalInput('notifications-file');
+    if (notificationsFile) {
+      const notificationsPath = await writeNotificationEnvelope(notificationsFile, notificationEnvelope);
+      core.setOutput('notifications-file', notificationsPath);
+    }
+    if (notificationWebhookUrl) {
+      const runId = process.env.GITHUB_RUN_ID?.trim();
+      const runAttempt = process.env.GITHUB_RUN_ATTEMPT?.trim() || '1';
+      const delivered = await deliverNotificationEnvelope(notificationEnvelope, {
+        webhookUrl: notificationWebhookUrl,
+        ...(notificationWebhookToken ? { token: notificationWebhookToken } : {}),
+        ...(runId ? { idempotencyKey: `deloitte-postman:${workspaceId}:${runId}:${runAttempt}` } : {})
+      });
+      core.setOutput('notification-delivered-count', String(delivered));
+      core.info(`Deloitte notification gateway accepted ${delivered} onboarding notification(s).`);
+    } else if (!dryRun && notificationCount > 0) {
+      core.info('Onboarding notifications were generated but not delivered because notification-webhook-url is not configured.');
+    }
 
     if (summary.counts.failed > 0) {
       throw new Error(`${summary.counts.failed} workspace access operation(s) failed.`);
