@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "repository": "deloitte/example-service",
+  "collaborators": [
+    {
+      "login": "service-owner",
+      "email": "service.owner@example.com",
+      "permission": "admin",
+      "externalId": "github-1001",
+      "givenName": "Service",
+      "familyName": "Owner"
+    },
+    {
+      "login": "api-developer",
+      "email": "api.developer@example.com",
+      "permission": "write",
+      "externalId": "github-1002",
+      "givenName": "API",
+      "familyName": "Developer"
+    },
+    {
+      "login": "api-reviewer",
+      "email": "api.reviewer@example.com",
+      "permission": "read",
+      "externalId": "github-1003"
+    }
+  ]
+}

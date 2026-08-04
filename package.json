@@ -1,0 +1,50 @@
+{
+  "name": "@postman-cse/deloitte-workspace-access",
+  "version": "0.1.0",
+  "description": "Reconcile GitHub collaborators into Postman workspace roles and provision missing team users through SCIM.",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "bin": {
+    "postman-workspace-access": "dist/cli.cjs"
+  },
+  "files": [
+    "action.yml",
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "bundle": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && esbuild src/index.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/index.cjs && esbuild src/cli.ts --bundle --platform=node --target=node24 --format=cjs --banner:js=\"#!/usr/bin/env node\" --outfile=dist/cli.cjs && node -e \"if(process.platform!=='win32')require('node:fs').chmodSync('dist/cli.cjs',0o755)\"",
+    "build": "npm run typecheck && npm run bundle",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "verify": "npm test && npm run build"
+  },
+  "keywords": [
+    "github-action",
+    "postman",
+    "scim",
+    "workspace",
+    "onboarding"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/postman-cs/deloitte-postman-workspace-access-action"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "esbuild": "^0.28.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  }
+}

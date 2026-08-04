@@ -1,0 +1,54 @@
+name: 'Deloitte: Postman Workspace Access'
+description: Provision missing Postman team users and reconcile GitHub collaborators into workspace roles.
+author: Postman
+branding:
+  icon: users
+  color: orange
+inputs:
+  workspace-id:
+    description: ID of the Postman workspace created by the onboarding pipeline.
+    required: true
+  members-json:
+    description: JSON array emitted by the GitHub scanner. Provide this or members-file.
+    required: false
+  members-file:
+    description: Path to a JSON file emitted by the GitHub scanner. Provide this or members-json.
+    required: false
+  role-map-json:
+    description: JSON map of GitHub permission names to Postman workspace role display names.
+    required: false
+    default: '{"admin":"Admin","maintain":"Editor","write":"Editor","push":"Editor","triage":"Viewer","read":"Viewer","pull":"Viewer"}'
+  postman-api-key:
+    description: Postman API key authorized to manage roles on the target workspace.
+    required: true
+  postman-scim-api-key:
+    description: SCIM API key used to look up users and invite/provision users who are not on the team.
+    required: false
+  dry-run:
+    description: Resolve and plan changes without creating users or assigning workspace roles.
+    required: false
+    default: 'false'
+  fail-on-pending-invites:
+    description: Fail when an invited user cannot receive a workspace role until they accept the team invite.
+    required: false
+    default: 'false'
+  postman-base-url:
+    description: Postman API base URL.
+    required: false
+    default: https://api.postman.com
+outputs:
+  summary-json:
+    description: Machine-readable reconciliation summary.
+  added-count:
+    description: Number of users assigned a workspace role.
+  invited-count:
+    description: Number of missing users submitted to Postman SCIM for provisioning or invitation.
+  pending-count:
+    description: Number of invited users waiting before their workspace role can be assigned.
+  skipped-count:
+    description: Number of dry-run or otherwise skipped entries.
+  failed-count:
+    description: Number of failed entries.
+runs:
+  using: node24
+  main: dist/index.cjs

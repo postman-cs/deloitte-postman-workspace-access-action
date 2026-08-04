@@ -1,0 +1,2 @@
+* text=auto eol=lf
+dist/*.cjs -diff linguist-generated=true
