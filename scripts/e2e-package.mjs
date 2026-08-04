@@ -14,6 +14,7 @@ import {
 const simulator = await startSimulator();
 try {
   await withTempDir('deloitte-package-e2e-', async (directory) => {
+    const sourcePackage = JSON.parse(await readFile('package.json', 'utf8'));
     const pack = await runProcess('npm', ['pack', '--json', '--pack-destination', directory]);
     assert.equal(pack.code, 0, pack.stderr);
     const metadata = JSON.parse(pack.stdout);
@@ -30,10 +31,11 @@ try {
       'utf8'
     ));
     assert.equal(installedPackage.name, '@postman-cse/deloitte-workspace-access');
-    assert.equal(installedPackage.version, '0.3.0');
+    assert.equal(installedPackage.version, sourcePackage.version);
     assert.equal(installedPackage.bin['postman-workspace-access'], 'dist/cli.cjs');
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/action.yml'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/QUICKSTART.md'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/BUILD_LOG.md'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/schemas/deloitte-github-scanner-output.schema.json'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/scripts/deloitte-init.sh'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/templates/deloitte-postman-workspace-access.yml'));

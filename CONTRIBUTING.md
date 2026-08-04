@@ -24,7 +24,7 @@ Runtime changes must include updated tests and rebuilt `dist/`. Scanner discover
 
 1. Update `package.json`, `package-lock.json`, and documentation references to the new exact semantic version.
 2. Merge through a pull request after all required checks pass.
-3. Create and push an annotated tag matching the package version, for example `v0.3.0`.
+3. Create and push an annotated tag matching the package version, for example `vX.Y.Z`.
 4. The Release workflow reruns QA, verifies the committed bundle, builds the starter kit and npm package, emits a CycloneDX SBOM and SHA-256 checksums, attests the artifacts, and creates the GitHub release.
 
 Never move or reuse a published version tag.

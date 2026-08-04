@@ -18,7 +18,7 @@ jobs:
       # Replace this fixture with the file or JSON output from Deloitte's scanner.
       - name: Reconcile workspace access
         id: access
-        uses: postman-cs/deloitte-postman-workspace-access-action@v0.3.0
+        uses: postman-cs/deloitte-postman-workspace-access-action@v0.3.1
         with:
           workspace-id: ${{ inputs.workspace_id }}
           members-file: examples/deloitte-scanner-output.json
