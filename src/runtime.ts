@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 
 import { parseMembersJson, parseRoleMap } from './contracts.js';
-import type { NormalizedMember } from './types.js';
+import type { NormalizedMember, ReconcileSummary, ValidationReport } from './types.js';
 
 const SCANNER_FILENAMES = new Set([
   'deloitte-github-scanner-output.json',
@@ -72,4 +72,86 @@ export async function resolveMembersInput(
 
 export function formatSummary(summary: unknown): string {
   return JSON.stringify(summary, null, 2);
+}
+
+export function buildValidationReport(
+  members: NormalizedMember[],
+  source: string
+): ValidationReport {
+  const workspaceRoles: Record<string, number> = {};
+  for (const member of members) {
+    workspaceRoles[member.workspaceRole] = (workspaceRoles[member.workspaceRole] ?? 0) + 1;
+  }
+  const withScimId = members.filter((member) => Boolean(member.scimId)).length;
+  return {
+    ok: true,
+    scanner: {
+      source,
+      uniqueMembers: members.length,
+      withScimId,
+      requiringScimLookup: members.length - withScimId
+    },
+    workspaceRoles,
+    members: members.map((member) => ({
+      email: member.email,
+      workspaceRole: member.workspaceRole,
+      ...(member.githubPermission ? { githubPermission: member.githubPermission } : {}),
+      ...(member.githubLogin ? { githubLogin: member.githubLogin } : {}),
+      hasScimId: Boolean(member.scimId)
+    }))
+  };
+}
+
+function markdownCell(value: unknown): string {
+  return String(value ?? '')
+    .replaceAll('|', '\\|')
+    .replaceAll('\r', ' ')
+    .replaceAll('\n', ' ');
+}
+
+function nextStep(result: ReconcileSummary['results'][number]): string {
+  if (result.workspaceAccess === 'pending') return 'Accept the Postman team invitation, then rerun.';
+  if (result.workspaceAccess === 'failed') return result.message ?? 'Review the operation error and rerun.';
+  if (result.workspaceAccess === 'would-add') return result.message ?? 'Review this preview before applying.';
+  return 'None.';
+}
+
+export function formatMarkdownSummary(summary: ReconcileSummary): string {
+  const status = summary.counts.failed > 0
+    ? '❌ Action required'
+    : summary.counts.pending > 0
+      ? '⚠️ Invitations pending'
+      : summary.dryRun
+        ? '🔎 Read-only preview'
+        : '✅ Complete';
+  const counts = [
+    ['Added', summary.counts.added],
+    ['Invited', summary.counts.invited],
+    ['Pending', summary.counts.pending],
+    [summary.dryRun ? 'Planned' : 'Skipped', summary.counts.skipped],
+    ['Failed', summary.counts.failed]
+  ];
+  const lines = [
+    '## Deloitte: Postman workspace access',
+    '',
+    `**${status}** — workspace \`${markdownCell(summary.workspaceId)}\``,
+    '',
+    '| Outcome | Count |',
+    '| --- | ---: |',
+    ...counts.map(([label, count]) => `| ${label} | ${count} |`),
+    '',
+    '### User results',
+    '',
+    '| User | Workspace role | Team lifecycle | Workspace access | Next step |',
+    '| --- | --- | --- | --- | --- |',
+    ...summary.results.map((result) => [
+      markdownCell(result.email),
+      markdownCell(result.workspaceRole),
+      markdownCell(result.lifecycle),
+      markdownCell(result.workspaceAccess),
+      markdownCell(nextStep(result))
+    ].join(' | ')).map((row) => `| ${row} |`),
+    ''
+  ];
+  return lines.join('\n');
 }

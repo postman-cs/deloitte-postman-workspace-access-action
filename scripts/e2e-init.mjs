@@ -34,19 +34,31 @@ try {
     const workflowPath = join(consumer, '.github/workflows/deloitte-postman-workspace-access.yml');
     const doctorPath = join(consumer, 'scripts/deloitte-postman-doctor.sh');
     const runbookPath = join(consumer, 'docs/deloitte-postman-workspace-access.md');
+    const prerequisitesPath = join(consumer, 'docs/deloitte-postman-prerequisites.md');
+    const sandboxSmokePath = join(consumer, 'docs/deloitte-postman-sandbox-smoke.md');
     await Promise.all([
       access(join(actionRoot, 'action.yml')),
       access(join(actionRoot, 'dist/index.cjs')),
       access(join(actionRoot, 'dist/cli.cjs'), constants.X_OK),
       access(workflowPath),
       access(doctorPath, constants.X_OK),
-      access(runbookPath)
+      access(runbookPath),
+      access(prerequisitesPath),
+      access(sandboxSmokePath)
     ]);
 
     const workflow = parse(await readFile(workflowPath, 'utf8'));
     assert(workflow.on.workflow_call);
-    assert.equal(workflow.jobs.reconcile.steps.at(-1).uses, './.github/actions/deloitte-postman-workspace-access');
-    assert.equal(workflow.jobs.reconcile.steps[1].uses, 'actions/download-artifact@v8');
+    assert.equal(
+      workflow.jobs.reconcile.steps.some(
+        (step) => step.uses === './.github/actions/deloitte-postman-workspace-access'
+      ),
+      true
+    );
+    assert.equal(
+      workflow.jobs.reconcile.steps[1].uses,
+      'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c'
+    );
 
     const doctor = await runProcess(doctorPath, [
       '--workspace-id', 'workspace-init',
@@ -63,6 +75,15 @@ try {
     assert.equal(report.scanner.members, 2);
     assert.equal(simulator.requestsFor('init').every((request) => request.method === 'GET'), true);
 
+    const validate = await runProcess(doctorPath, [
+      'validate', '--scanner-search-root', artifactRoot
+    ], {
+      cwd: consumer,
+      env: { POSTMAN_API_KEY: '', POSTMAN_SCIM_API_KEY: '' }
+    });
+    assert.equal(validate.code, 0, validate.stderr);
+    assert.equal(JSON.parse(validate.stdout).scanner.uniqueMembers, 2);
+
     const reinstall = await runProcess('bash', ['scripts/deloitte-init.sh', consumer]);
     assert.equal(reinstall.code, 73);
     assert.match(reinstall.stderr, /already exists/);
@@ -73,7 +94,7 @@ try {
     assert.match(await readFile(runbookPath, 'utf8'), /Sharooq's operating path/);
   });
 
-  process.stdout.write('Sharooq starter kit e2e: install, workflow, doctor, overwrite protection, and upgrade passed.\n');
+  process.stdout.write('Sharooq starter kit e2e: install, credential-free validation, doctor, workflow, protection, and upgrade passed.\n');
 } finally {
   await simulator.close();
 }

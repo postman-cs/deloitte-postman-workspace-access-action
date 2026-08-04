@@ -15,7 +15,7 @@ For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). Sharooq's one
 ## Sharooq's golden path
 
 ```bash
-git clone --branch v0.2.0 --depth 1 \
+git clone --branch v0.3.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 ./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
@@ -33,6 +33,15 @@ cd /path/to/deloitte-pipeline
 
 The installed runbook contains the caller job Sharooq adds after Deloitte's onboarding and GitHub scanner jobs. Pull requests preview the access plan; pushes to `main` apply it.
 
+Before requesting either credential, validate the scanner artifact locally:
+
+```bash
+./scripts/deloitte-postman-doctor.sh validate \
+  --scanner-search-root artifacts
+```
+
+Validation checks emails and permission mapping, normalizes duplicate emails, and reports SCIM-ID coverage and requested workspace roles without making a network request.
+
 ## Fastest integration
 
 ```yaml
@@ -47,7 +56,7 @@ The installed runbook contains the caller job Sharooq adds after Deloitte's onbo
 
 - name: Reconcile workspace access
   id: access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.2.0
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.3.0
   with:
     workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-json: ${{ steps['github-scanner'].outputs['members-json'] }}
@@ -175,6 +184,8 @@ postman-workspace-access doctor \
 
 Doctor verifies the target workspace, Postman and SCIM credentials, scanner contract, user resolution, and role map. It issues only read-only requests and returns a machine-readable plan.
 
+See [Postman prerequisites](docs/POSTMAN-PREREQUISITES.md) for the plan, service-account, workspace, scanner-email, and credential requirements.
+
 ## Outputs
 
 - `summary-json` — Complete reconciliation result.
@@ -183,6 +194,26 @@ Doctor verifies the target workspace, Postman and SCIM credentials, scanner cont
 - `pending-count` — Invited users who must accept before workspace access can be assigned.
 - `skipped-count` — Planned operations in dry-run mode.
 - `failed-count` — Entries that failed.
+- `scanner-source` — The exact scanner input selected by discovery.
+- `summary-file` — The JSON report path when `summary-file` is configured.
+
+The reusable workflow always uploads the JSON report as a retained GitHub Actions artifact. Its job summary shows outcome counts and a per-user remediation table.
+
+## Protected live smoke test
+
+The manual `Postman sandbox smoke test` workflow provides the final tenant-level validation. It uses a dedicated `postman-sandbox` environment and separate sandbox secrets, always previews first, and requires the exact confirmation `INVITE_DISPOSABLE_USER` before it can invite an approved disposable address. See [the sandbox smoke guide](docs/SANDBOX-SMOKE.md).
+
+## Release integrity and external handoff
+
+Every release contains:
+
+- A ready-to-send starter-kit archive.
+- The packed npm artifact.
+- A CycloneDX SBOM.
+- A manifest and SHA-256 checksums.
+- GitHub build-provenance attestations.
+
+This allows an internal maintainer to download and securely transfer the starter kit when Sharooq cannot access the private `postman-cs` repository directly.
 
 ## Credentials and permissions
 

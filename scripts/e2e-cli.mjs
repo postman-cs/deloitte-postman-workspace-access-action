@@ -188,6 +188,27 @@ try {
       true
     );
 
+    const validate = await runProcess(process.execPath, [
+      'dist/cli.cjs',
+      'validate',
+      '--scanner-search-root', doctorRoot
+    ], { env: { POSTMAN_API_KEY: '', POSTMAN_SCIM_API_KEY: '' } });
+    assert.equal(validate.code, 0, validate.stderr);
+    const validationReport = JSON.parse(validate.stdout);
+    assert.equal(validationReport.ok, true);
+    assert.equal(validationReport.scanner.uniqueMembers, 2);
+    assert.equal(validationReport.scanner.requiringScimLookup, 2);
+    assert.deepEqual(validationReport.workspaceRoles, { Admin: 1, Viewer: 1 });
+    assert.equal(simulator.requestsFor('validate').length, 0);
+
+    const invalidValidation = await runProcess(process.execPath, [
+      'dist/cli.cjs',
+      'validate',
+      '--members-json', JSON.stringify([{ login: 'missing-email', permission: 'read' }])
+    ], { env: { POSTMAN_API_KEY: '', POSTMAN_SCIM_API_KEY: '' } });
+    assert.equal(invalidValidation.code, 1);
+    assert.match(invalidValidation.stderr, /valid email address/);
+
     const invalid = await runCli(simulator.baseUrl, 'workspace-invalid', [
       { email: 'not-an-email', permission: 'read' }
     ], { scenario: 'invalid' });
@@ -208,7 +229,7 @@ try {
     assert.match(help.stdout, /postman-workspace-access/);
   });
 
-  process.stdout.write('CLI e2e matrix: lifecycle, doctor, discovery, retry, fallback, validation, and exit-code paths passed.\n');
+  process.stdout.write('CLI e2e matrix: lifecycle, credential-free validation, doctor, discovery, retry, fallback, and exit-code paths passed.\n');
 } finally {
   await simulator.close();
 }

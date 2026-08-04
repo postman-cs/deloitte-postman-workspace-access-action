@@ -30,6 +30,7 @@ describe('GitHub Action contract', () => {
       'members-file',
       'scanner-search-root',
       'role-map-json',
+      'summary-file',
       'dry-run',
       'fail-on-pending-invites'
     ]));
@@ -39,7 +40,8 @@ describe('GitHub Action contract', () => {
       'invited-count',
       'pending-count',
       'failed-count',
-      'scanner-source'
+      'scanner-source',
+      'summary-file'
     ]));
     expect(() => JSON.parse(action.inputs?.['role-map-json']?.default ?? '')).not.toThrow();
   });

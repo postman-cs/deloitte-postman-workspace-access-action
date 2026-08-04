@@ -11,6 +11,15 @@ Add these GitHub Actions secrets to the Deloitte pipeline repository:
 
 The installer creates a local action, a reusable workflow, and a doctor command. Do not store either key in a repository variable, scanner artifact, or log.
 
+Before credentials are available, validate the scanner artifact without network access:
+
+```bash
+./scripts/deloitte-postman-doctor.sh validate \
+  --scanner-search-root artifacts
+```
+
+Read `docs/deloitte-postman-prerequisites.md` for the complete Postman and scanner checklist.
+
 ## Verify before the first run
 
 From the consumer repository:
@@ -52,6 +61,8 @@ If the scanner uploads an artifact, add this job after the existing onboarding a
 
 This gives Sharooq a read-only preview on pull requests and applies the same plan after merge to `main`.
 
+Each run adds a per-user remediation table to the job summary and uploads the complete JSON result as a retained Actions artifact.
+
 If the scanner writes its JSON into the checked-out workspace instead of an artifact, omit `scanner-artifact`. The action will find the file automatically.
 
 ## Understand a run
@@ -91,3 +102,5 @@ Run the newer release's installer with `--upgrade`. It overwrites only the four 
 ```
 
 Run doctor again, review the pull-request preview, and merge only after it matches the expected access plan.
+
+For the final tenant-level test, follow `docs/deloitte-postman-sandbox-smoke.md`. The protected workflow uses separate sandbox secrets and refuses invitation mode without explicit confirmation.

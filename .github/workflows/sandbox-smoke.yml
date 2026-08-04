@@ -1,0 +1,114 @@
+name: Postman sandbox smoke test
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace_id:
+        description: Dedicated non-production Postman workspace ID.
+        required: true
+        type: string
+      existing_user_email:
+        description: Existing Postman sandbox team user.
+        required: true
+        type: string
+      disposable_invite_email:
+        description: Approved disposable address that may receive a Postman invitation.
+        required: true
+        type: string
+      mode:
+        description: Preview is GET-only. Apply may send an invitation and assign workspace roles.
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - apply-and-invite
+      confirmation:
+        description: For apply-and-invite, enter exactly INVITE_DISPOSABLE_USER.
+        required: false
+        type: string
+      change_reference:
+        description: Approval, change-ticket, or test-plan reference for this run.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postman-sandbox-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Protected sandbox smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: postman-sandbox
+    steps:
+      - name: Check out tested revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate explicit authorization and test identities
+        shell: bash
+        env:
+          MODE: ${{ inputs.mode }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          EXISTING_EMAIL: ${{ inputs.existing_user_email }}
+          DISPOSABLE_EMAIL: ${{ inputs.disposable_invite_email }}
+          CHANGE_REFERENCE: ${{ inputs.change_reference }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { mkdirSync, writeFileSync } from 'node:fs';
+          const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          const required = ['EXISTING_EMAIL', 'DISPOSABLE_EMAIL', 'CHANGE_REFERENCE'];
+          for (const name of required) {
+            if (!process.env[name]?.trim()) throw new Error(`${name} is required.`);
+          }
+          if (!email.test(process.env.EXISTING_EMAIL)) throw new Error('existing_user_email is invalid.');
+          if (!email.test(process.env.DISPOSABLE_EMAIL)) throw new Error('disposable_invite_email is invalid.');
+          if (process.env.EXISTING_EMAIL.toLowerCase() === process.env.DISPOSABLE_EMAIL.toLowerCase()) {
+            throw new Error('The existing and disposable users must be different.');
+          }
+          if (process.env.MODE === 'apply-and-invite' && process.env.CONFIRMATION !== 'INVITE_DISPOSABLE_USER') {
+            throw new Error('Apply mode requires confirmation INVITE_DISPOSABLE_USER.');
+          }
+          mkdirSync('.postman-sandbox-smoke', { recursive: true });
+          writeFileSync('.postman-sandbox-smoke/scanner-output.json', `${JSON.stringify({ collaborators: [
+            { email: process.env.EXISTING_EMAIL, workspaceRole: 'Viewer' },
+            { email: process.env.DISPOSABLE_EMAIL, workspaceRole: 'Viewer' }
+          ] }, null, 2)}\n`, { mode: 0o600 });
+          NODE
+
+      - name: Preview sandbox changes
+        id: preview
+        uses: ./
+        with:
+          workspace-id: ${{ inputs.workspace_id }}
+          members-file: .postman-sandbox-smoke/scanner-output.json
+          postman-api-key: ${{ secrets.POSTMAN_SANDBOX_API_KEY }}
+          postman-scim-api-key: ${{ secrets.POSTMAN_SANDBOX_SCIM_API_KEY }}
+          dry-run: 'true'
+          summary-file: .postman-sandbox-smoke/preview-summary.json
+
+      - name: Apply approved sandbox smoke test
+        if: ${{ inputs.mode == 'apply-and-invite' }}
+        id: apply
+        uses: ./
+        with:
+          workspace-id: ${{ inputs.workspace_id }}
+          members-file: .postman-sandbox-smoke/scanner-output.json
+          postman-api-key: ${{ secrets.POSTMAN_SANDBOX_API_KEY }}
+          postman-scim-api-key: ${{ secrets.POSTMAN_SANDBOX_SCIM_API_KEY }}
+          dry-run: 'false'
+          fail-on-pending-invites: 'false'
+          summary-file: .postman-sandbox-smoke/apply-summary.json
+
+      - name: Upload smoke-test evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: postman-sandbox-smoke-${{ github.run_id }}
+          path: .postman-sandbox-smoke/*-summary.json
+          retention-days: 30
+          if-no-files-found: error

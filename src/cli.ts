@@ -4,7 +4,7 @@ import { DEFAULT_ROLE_MAP, parseBoolean } from './contracts.js';
 import { diagnoseWorkspaceAccess } from './doctor.js';
 import { PostmanClient } from './postman-client.js';
 import { reconcileWorkspaceAccess } from './reconcile.js';
-import { formatSummary, resolveMembersInput } from './runtime.js';
+import { buildValidationReport, formatSummary, resolveMembersInput } from './runtime.js';
 
 const HELP = `postman-workspace-access
 
@@ -13,6 +13,7 @@ Reconcile scanner-produced collaborators into a Postman workspace.
 Usage:
   postman-workspace-access --workspace-id <id> --members-file <path> [options]
   postman-workspace-access doctor --workspace-id <id> [options]
+  postman-workspace-access validate [--members-file <path> | --scanner-search-root <path>]
 
 Options:
   --workspace-id <id>               Target Postman workspace ID.
@@ -26,13 +27,13 @@ Options:
   --help                            Show this help.
 
 Environment:
-  POSTMAN_API_KEY                    Required Postman API key.
-  POSTMAN_SCIM_API_KEY               Required to provision or invite missing users.
+  POSTMAN_API_KEY                    Required for doctor and reconciliation; not required for validate.
+  POSTMAN_SCIM_API_KEY               Required for doctor and for users needing SCIM lookup/provisioning.
 `;
 
 export async function runCli(argv = process.argv.slice(2)): Promise<number> {
-  const doctor = argv[0] === 'doctor';
-  const commandArgs = doctor ? argv.slice(1) : argv;
+  const command = argv[0] === 'doctor' || argv[0] === 'validate' ? argv[0] : 'reconcile';
+  const commandArgs = command === 'reconcile' ? argv : argv.slice(1);
   const { values } = parseArgs({
     args: commandArgs,
     allowPositionals: false,
@@ -54,10 +55,6 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
     return 0;
   }
 
-  const workspaceId = values['workspace-id']?.trim();
-  if (!workspaceId) throw new Error('--workspace-id is required.');
-  const postmanApiKey = process.env.POSTMAN_API_KEY?.trim();
-  if (!postmanApiKey) throw new Error('POSTMAN_API_KEY is required.');
   const resolved = await resolveMembersInput(
     values['members-json'],
     values['members-file'],
@@ -65,6 +62,15 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
     values['scanner-search-root']
   );
   if (resolved.discovered) process.stderr.write(`info: Auto-discovered scanner output at ${resolved.source}.\n`);
+  if (command === 'validate') {
+    process.stdout.write(`${formatSummary(buildValidationReport(resolved.members, resolved.source))}\n`);
+    return 0;
+  }
+
+  const workspaceId = values['workspace-id']?.trim();
+  if (!workspaceId) throw new Error('--workspace-id is required.');
+  const postmanApiKey = process.env.POSTMAN_API_KEY?.trim();
+  if (!postmanApiKey) throw new Error('POSTMAN_API_KEY is required.');
   const client = new PostmanClient({
     postmanApiKey,
     ...(process.env.POSTMAN_SCIM_API_KEY?.trim()
@@ -72,7 +78,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
       : {}),
     ...(values['postman-base-url'] ? { baseUrl: values['postman-base-url'] } : {})
   });
-  if (doctor) {
+  if (command === 'doctor') {
     const report = await diagnoseWorkspaceAccess(client, {
       workspaceId,
       members: resolved.members,

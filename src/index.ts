@@ -1,9 +1,11 @@
 import * as core from '@actions/core';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 
 import { parseBoolean } from './contracts.js';
 import { PostmanClient } from './postman-client.js';
 import { reconcileWorkspaceAccess } from './reconcile.js';
-import { formatSummary, resolveMembersInput } from './runtime.js';
+import { formatMarkdownSummary, formatSummary, resolveMembersInput } from './runtime.js';
 
 function optionalInput(name: string): string | undefined {
   const value = core.getInput(name).trim();
@@ -50,10 +52,14 @@ export async function runAction(): Promise<void> {
     core.setOutput('skipped-count', String(summary.counts.skipped));
     core.setOutput('failed-count', String(summary.counts.failed));
     core.setOutput('scanner-source', resolved.source);
-    await core.summary
-      .addHeading('Postman workspace access')
-      .addCodeBlock(formatSummary(summary), 'json')
-      .write();
+    const summaryFile = optionalInput('summary-file');
+    if (summaryFile) {
+      const summaryPath = resolve(summaryFile);
+      await mkdir(dirname(summaryPath), { recursive: true });
+      await writeFile(summaryPath, `${formatSummary(summary)}\n`, { mode: 0o600 });
+      core.setOutput('summary-file', summaryPath);
+    }
+    await core.summary.addRaw(formatMarkdownSummary(summary)).write();
 
     if (summary.counts.failed > 0) {
       throw new Error(`${summary.counts.failed} workspace access operation(s) failed.`);
