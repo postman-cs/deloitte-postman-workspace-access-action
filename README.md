@@ -10,6 +10,8 @@ Plug-and-play workspace membership for API onboarding pipelines. Feed the action
 
 The implementation uses the public Postman [SCIM create-user API](https://learning.postman.com/api-docs/api-reference/scim/create-scim-user) and [workspace-role API](https://learning.postman.com/api-docs/api-reference/workspaces/update-workspace-roles). Workspace role updates use SCIM IDs, so the scanner never needs to know Postman-internal user IDs.
 
+For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). It includes direct, vendored, and generic-CI installation paths.
+
 ## Fastest integration
 
 ```yaml
@@ -24,7 +26,7 @@ The implementation uses the public Postman [SCIM create-user API](https://learni
 
 - name: Reconcile workspace access
   id: access
-  uses: postman-cs/deloitte-postman-workspace-access-action@main
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.1.0
   with:
     workspace-id: ${{ steps.onboard.outputs.workspace-id }}
     members-json: ${{ steps.github-scanner.outputs.members-json }}
@@ -32,7 +34,7 @@ The implementation uses the public Postman [SCIM create-user API](https://learni
     postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
 ```
 
-Use `@main` only while evaluating the initial handoff. Pin an immutable release tag or commit SHA before production rollout.
+The release tag is immutable. Deloitte can also vendor the self-contained action bundle into its own repository if direct private-repository access isn't available.
 
 ## Scanner contract
 

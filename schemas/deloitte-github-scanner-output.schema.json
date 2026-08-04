@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/postman-cs/deloitte-postman-workspace-access-action/schemas/deloitte-github-scanner-output.schema.json",
+  "title": "Deloitte GitHub scanner workspace members",
+  "oneOf": [
+    {
+      "type": "array",
+      "items": { "$ref": "#/$defs/member" }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "type": ["integer", "string"] },
+        "repository": { "type": "string" },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/member" }
+        },
+        "collaborators": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/member" }
+        }
+      },
+      "anyOf": [
+        { "required": ["members"] },
+        { "required": ["collaborators"] }
+      ],
+      "additionalProperties": true
+    }
+  ],
+  "$defs": {
+    "member": {
+      "type": "object",
+      "required": ["email"],
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "login": { "type": "string" },
+        "externalId": { "type": ["string", "number"] },
+        "scimId": { "type": ["string", "number"] },
+        "givenName": { "type": "string" },
+        "familyName": { "type": "string" },
+        "displayName": { "type": "string" },
+        "githubPermission": { "type": "string" },
+        "permission": { "type": "string" },
+        "role": { "type": "string" },
+        "role_name": { "type": "string" },
+        "workspaceRole": { "type": "string" },
+        "postmanRole": { "type": "string" },
+        "permissions": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        }
+      },
+      "anyOf": [
+        { "required": ["githubPermission"] },
+        { "required": ["permission"] },
+        { "required": ["role"] },
+        { "required": ["role_name"] },
+        { "required": ["permissions"] },
+        { "required": ["workspaceRole"] },
+        { "required": ["postmanRole"] }
+      ],
+      "additionalProperties": true
+    }
+  }
+}

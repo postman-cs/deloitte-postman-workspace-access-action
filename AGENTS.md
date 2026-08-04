@@ -6,9 +6,8 @@ Reconciles GitHub scanner collaborator data into Postman workspace membership. D
 
 ```bash
 npm ci
-npm test
-npm run typecheck
-npm run build
+npm run qa
+npm run verify:dist
 ```
 
 ## Behavioral contracts

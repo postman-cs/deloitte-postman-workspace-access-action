@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "repository": "deloitte/e2e-service",
+  "collaborators": [
+    {
+      "login": "existing-owner",
+      "email": "existing.owner@example.com",
+      "permission": "admin"
+    },
+    {
+      "login": "new-developer",
+      "email": "new.developer@example.com",
+      "permission": "write",
+      "givenName": "New",
+      "familyName": "Developer"
+    }
+  ]
+}
