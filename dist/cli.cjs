@@ -299,15 +299,18 @@ var PostmanClient = class {
       if (!(error instanceof HttpError) || error.status !== 409) throw error;
       const existing = await this.findScimUserByEmail(member.email);
       if (!existing) throw error;
-      return existing;
+      return { user: existing, created: false };
     }
     const id = typeof payload.id === "string" ? payload.id.trim() : "";
     const userName = typeof payload.userName === "string" ? payload.userName.trim() : member.email;
     if (!id) throw new Error(`Postman SCIM did not return an ID for ${member.email}.`);
     return {
-      id,
-      userName,
-      ...typeof payload.active === "boolean" ? { active: payload.active } : {}
+      user: {
+        id,
+        userName,
+        ...typeof payload.active === "boolean" ? { active: payload.active } : {}
+      },
+      created: true
     };
   }
   async reactivateScimUser(user) {
@@ -377,7 +380,7 @@ function resultFor(assignment, workspaceAccess, message) {
   return {
     email: assignment.member.email,
     workspaceRole: assignment.member.workspaceRole,
-    lifecycle: assignment.provisioned ? "provisioned" : assignment.member.scimId ? "provided-scim-id" : "existing",
+    lifecycle: assignment.lifecycle,
     workspaceAccess,
     scimId: assignment.scimId,
     ...message ? { message } : {}
@@ -401,7 +404,7 @@ async function reconcileWorkspaceAccess(client, options, reporter) {
       continue;
     }
     let scimId = member.scimId;
-    let provisioned = false;
+    let lifecycle = member.scimId ? "provided-scim-id" : "existing";
     try {
       if (!scimId) {
         const existing = await client.findScimUserByEmail(member.email);
@@ -410,7 +413,7 @@ async function reconcileWorkspaceAccess(client, options, reporter) {
             results.push({
               email: member.email,
               workspaceRole: member.workspaceRole,
-              lifecycle: "would-provision",
+              lifecycle: "would-reactivate",
               workspaceAccess: "would-add",
               scimId: existing.id,
               message: "Would reactivate the existing SCIM user, then assign the workspace role."
@@ -419,7 +422,7 @@ async function reconcileWorkspaceAccess(client, options, reporter) {
           }
           const reactivated = await client.reactivateScimUser(existing);
           scimId = reactivated.id;
-          provisioned = true;
+          lifecycle = "reactivated";
           reporter.info(`Reactivated ${member.email} through Postman SCIM.`);
         } else {
           scimId = existing?.id;
@@ -436,13 +439,15 @@ async function reconcileWorkspaceAccess(client, options, reporter) {
         continue;
       }
       if (!scimId) {
-        const created = await client.provisionScimUser(member);
-        scimId = created.id;
-        provisioned = true;
-        reporter.info(`Submitted ${member.email} to Postman SCIM for provisioning or invitation.`);
+        const provision = await client.provisionScimUser(member);
+        scimId = provision.user.id;
+        lifecycle = provision.created ? "provisioned" : "existing";
+        if (provision.created) {
+          reporter.info(`Submitted ${member.email} to Postman SCIM for provisioning or invitation.`);
+        }
       }
       if (!scimId) throw new Error(`Unable to resolve a SCIM ID for ${member.email}.`);
-      assignments.push({ member, scimId, roleId, provisioned });
+      assignments.push({ member, scimId, roleId, lifecycle });
     } catch (error) {
       results.push({
         email: member.email,
@@ -481,7 +486,7 @@ async function reconcileWorkspaceAccess(client, options, reporter) {
         }]);
         results.push(resultFor(assignment, "added"));
       } catch (error) {
-        const pending = assignment.provisioned && error instanceof HttpError && PENDING_INVITE_STATUSES.has(error.status);
+        const pending = assignment.lifecycle === "provisioned" && error instanceof HttpError && PENDING_INVITE_STATUSES.has(error.status);
         results.push(resultFor(
           assignment,
           pending ? "pending" : "failed",

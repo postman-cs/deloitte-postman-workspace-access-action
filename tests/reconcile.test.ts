@@ -97,6 +97,39 @@ describe('workspace access reconciliation', () => {
     expect(summary.results[0]).toMatchObject({ lifecycle: 'provisioned', workspaceAccess: 'added' });
   });
 
+  it('handles a SCIM create race without counting an existing user as invited', async () => {
+    let lookupCount = 0;
+    const fetcher: FetchLike = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/workspace-roles')) return roleCatalog();
+      if (url.includes('/scim/v2/Users?')) {
+        lookupCount += 1;
+        return lookupCount === 1
+          ? json(200, { Resources: [] })
+          : json(200, { Resources: [{ id: 'race-scim', userName: member.email, active: true }] });
+      }
+      if (url.endsWith('/scim/v2/Users') && init?.method === 'POST') {
+        return json(409, { error: 'User already exists' });
+      }
+      if (url.endsWith('/workspaces/ws-1/roles')) return json(200, { roles: [] });
+      throw new Error(`Unexpected request ${url}`);
+    });
+    const client = new PostmanClient({
+      postmanApiKey: 'pmak-test',
+      scimApiKey: 'scim-test',
+      fetcher
+    });
+
+    const summary = await reconcileWorkspaceAccess(client, {
+      workspaceId: 'ws-1',
+      members: [member],
+      dryRun: false
+    }, reporter);
+
+    expect(summary.counts).toEqual({ added: 1, invited: 0, pending: 0, skipped: 0, failed: 0 });
+    expect(summary.results[0]).toMatchObject({ lifecycle: 'existing', workspaceAccess: 'added' });
+  });
+
   it('reactivates an inactive SCIM user before assigning workspace access', async () => {
     const methods: string[] = [];
     const fetcher: FetchLike = vi.fn(async (input, init) => {
@@ -125,7 +158,8 @@ describe('workspace access reconciliation', () => {
     }, reporter);
 
     expect(methods).toContain('PATCH /scim/v2/Users/inactive-scim');
-    expect(summary.counts).toEqual({ added: 1, invited: 1, pending: 0, skipped: 0, failed: 0 });
+    expect(summary.counts).toEqual({ added: 1, invited: 0, pending: 0, skipped: 0, failed: 0 });
+    expect(summary.results[0]).toMatchObject({ lifecycle: 'reactivated', workspaceAccess: 'added' });
   });
 
   it('reports an invited user as pending when Postman cannot assign the role yet', async () => {

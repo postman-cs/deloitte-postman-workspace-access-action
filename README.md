@@ -26,7 +26,7 @@ For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). It includes d
 
 - name: Reconcile workspace access
   id: access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.1.0
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.1.1
   with:
     workspace-id: ${{ steps.onboard.outputs.workspace-id }}
     members-json: ${{ steps.github-scanner.outputs.members-json }}

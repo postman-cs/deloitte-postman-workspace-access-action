@@ -52,13 +52,15 @@ export interface RoleAssignment {
   member: NormalizedMember;
   scimId: string;
   roleId: string;
-  provisioned: boolean;
+  lifecycle: 'provided-scim-id' | 'existing' | 'reactivated' | 'provisioned';
 }
 
 export type UserLifecycle =
   | 'provided-scim-id'
   | 'existing'
+  | 'reactivated'
   | 'provisioned'
+  | 'would-reactivate'
   | 'would-provision'
   | 'failed';
 

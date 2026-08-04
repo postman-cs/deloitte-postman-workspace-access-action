@@ -25,6 +25,11 @@ export interface PostmanClientOptions {
   fetcher?: FetchLike;
 }
 
+export interface ScimProvisionResult {
+  user: ScimUser;
+  created: boolean;
+}
+
 interface JsonResponse {
   [key: string]: unknown;
 }
@@ -127,7 +132,7 @@ export class PostmanClient {
     return undefined;
   }
 
-  async provisionScimUser(member: NormalizedMember): Promise<ScimUser> {
+  async provisionScimUser(member: NormalizedMember): Promise<ScimProvisionResult> {
     if (!this.scimApiKey) {
       throw new Error(`A Postman SCIM API key is required to provision ${member.email}.`);
     }
@@ -157,15 +162,18 @@ export class PostmanClient {
       if (!(error instanceof HttpError) || error.status !== 409) throw error;
       const existing = await this.findScimUserByEmail(member.email);
       if (!existing) throw error;
-      return existing;
+      return { user: existing, created: false };
     }
     const id = typeof payload.id === 'string' ? payload.id.trim() : '';
     const userName = typeof payload.userName === 'string' ? payload.userName.trim() : member.email;
     if (!id) throw new Error(`Postman SCIM did not return an ID for ${member.email}.`);
     return {
-      id,
-      userName,
-      ...(typeof payload.active === 'boolean' ? { active: payload.active } : {})
+      user: {
+        id,
+        userName,
+        ...(typeof payload.active === 'boolean' ? { active: payload.active } : {})
+      },
+      created: true
     };
   }
 

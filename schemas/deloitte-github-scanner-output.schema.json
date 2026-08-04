@@ -36,16 +36,25 @@
         "email": { "type": "string", "format": "email" },
         "login": { "type": "string" },
         "externalId": { "type": ["string", "number"] },
+        "external_id": { "type": ["string", "number"] },
         "scimId": { "type": ["string", "number"] },
+        "scim_id": { "type": ["string", "number"] },
         "givenName": { "type": "string" },
+        "given_name": { "type": "string" },
         "familyName": { "type": "string" },
+        "family_name": { "type": "string" },
         "displayName": { "type": "string" },
+        "display_name": { "type": "string" },
         "githubPermission": { "type": "string" },
+        "github_permission": { "type": "string" },
         "permission": { "type": "string" },
         "role": { "type": "string" },
+        "roleName": { "type": "string" },
         "role_name": { "type": "string" },
         "workspaceRole": { "type": "string" },
+        "workspace_role": { "type": "string" },
         "postmanRole": { "type": "string" },
+        "postman_role": { "type": "string" },
         "permissions": {
           "type": "object",
           "additionalProperties": { "type": "boolean" }
@@ -53,12 +62,16 @@
       },
       "anyOf": [
         { "required": ["githubPermission"] },
+        { "required": ["github_permission"] },
         { "required": ["permission"] },
         { "required": ["role"] },
+        { "required": ["roleName"] },
         { "required": ["role_name"] },
         { "required": ["permissions"] },
         { "required": ["workspaceRole"] },
-        { "required": ["postmanRole"] }
+        { "required": ["workspace_role"] },
+        { "required": ["postmanRole"] },
+        { "required": ["postman_role"] }
       ],
       "additionalProperties": true
     }
