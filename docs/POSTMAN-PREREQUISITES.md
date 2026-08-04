@@ -41,13 +41,13 @@ Official references:
 
 ## Scanner requirements
 
-Every collaborator must have:
+Every collaborator must resolve to:
 
-- A valid email address that corresponds to the person's Postman identity.
+- A valid corporate email that corresponds to the person's Postman identity. It can come directly from scanner output or from the configured GitHub-login identity map.
 
 A supported GitHub permission or explicit `workspaceRole`/`postmanRole` produces a stronger or deliberate mapping. When neither is present, the action assigns the inclusive `Viewer` baseline so the collaborator is not dropped.
 
-GitHub profiles frequently omit private email addresses. Deloitte's scanner must obtain an approved corporate email from its authoritative identity source rather than assuming the public GitHub profile contains one.
+GitHub profiles frequently omit private email addresses. Deloitte's scanner or identity map must obtain an approved corporate email from its authoritative identity source rather than assuming the public GitHub profile contains one. Unresolved entries are reported and do not block valid contributors unless `scanner.invalidMemberPolicy` is set to `fail`.
 
 Validate the scanner artifact before requesting credentials:
 

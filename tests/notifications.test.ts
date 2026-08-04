@@ -131,6 +131,20 @@ describe('Deloitte onboarding notifications', () => {
     })).rejects.toThrow(/HTTP 400/);
   });
 
+  it('adds adoption links and enforces the recipient-domain allowlist', async () => {
+    const envelope = buildNotificationEnvelope(summary(), {
+      gettingStartedUrl: 'https://learning.postman.com/docs/getting-started/overview/',
+      helpUrl: 'https://support.postman.com/',
+      allowedDomains: ['@deloitte.com']
+    });
+    expect(envelope.notifications[0]?.text).toContain('Start here: https://learning.postman.com/');
+    expect(envelope.notifications[0]?.html).toContain('Get help with access');
+    await expect(deliverNotificationEnvelope(envelope, {
+      webhookUrl: 'https://notifications.example.com/postman',
+      fetchImpl: async () => new Response('{}', { status: 202 })
+    })).rejects.toThrow(/outside the configured domain allowlist/);
+  });
+
   it('writes a private JSON artifact containing both email bodies', async () => {
     const directory = process.env.RUNNER_TEMP ?? process.cwd();
     const path = join(directory, `.notification-test-${process.pid}.json`);

@@ -7,7 +7,8 @@ const WORKFLOW_FILES = [
   '.github/workflows/ci.yml',
   '.github/workflows/release.yml',
   '.github/workflows/sandbox-smoke.yml',
-  'templates/deloitte-postman-workspace-access.yml'
+  'templates/deloitte-postman-workspace-access.yml',
+  'templates/deloitte-postman-pending-reconcile.yml'
 ];
 
 describe('repository governance and supply chain', () => {

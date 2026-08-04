@@ -14,18 +14,30 @@ inputs:
   members-file:
     description: Path to a JSON file emitted by the GitHub scanner. If omitted with members-json, the action auto-discovers a uniquely named scanner output.
     required: false
+  config-file:
+    description: Optional Deloitte configuration file. Defaults to .deloitte-postman.yml when present.
+    required: false
   scanner-search-root:
     description: Root directory searched recursively when members-file and members-json are omitted.
     required: false
-    default: .
+  identity-map-file:
+    description: Optional JSON or login,email CSV mapping for scanner records that contain a GitHub login but no email.
+    required: false
+  invalid-member-policy:
+    description: Continue valid onboarding while reporting unresolved scanner records, or fail before writes. Values are continue or fail.
+    required: false
+  exclude-bots:
+    description: Exclude GitHub bot records from onboarding when true.
+    required: false
+  exclude-logins-json:
+    description: JSON array of GitHub logins intentionally excluded from onboarding.
+    required: false
   role-map-json:
     description: JSON overrides or extensions mapping GitHub permission names to Postman workspace role display names.
     required: false
-    default: '{"admin":"Admin","maintain":"Editor","write":"Editor","push":"Editor","triage":"Viewer","read":"Viewer","pull":"Viewer"}'
   default-workspace-role:
     description: Inclusive fallback role assigned to detected collaborators with no explicit or mapped GitHub permission.
     required: false
-    default: Viewer
   postman-api-key:
     description: Postman API key authorized to manage roles on the target workspace.
     required: true
@@ -50,14 +62,12 @@ inputs:
   postman-workspace-url:
     description: Workspace link placed in each rendered onboarding email. Defaults to the Postman home page.
     required: false
-    default: https://go.postman.co/
   source-repository:
     description: Repository name shown in onboarding emails. Defaults to the current GitHub repository.
     required: false
   notification-subject:
     description: Subject line for rendered onboarding emails.
     required: false
-    default: 'Deloitte: Your Postman workspace access'
   notifications-file:
     description: Optional path where rendered plain-text and HTML onboarding emails are written as JSON.
     required: false
@@ -80,8 +90,20 @@ outputs:
     description: Number of dry-run or otherwise skipped entries.
   failed-count:
     description: Number of failed entries.
+  detected-count:
+    description: Number of raw contributor records emitted by the scanner.
+  resolved-count:
+    description: Number of unique contributors eligible for Postman onboarding.
+  unresolved-count:
+    description: Number of scanner records requiring an email or role correction.
+  excluded-count:
+    description: Number of intentionally excluded scanner records.
+  unresolved-json:
+    description: Machine-readable unresolved scanner records with remediation reasons.
   scanner-source:
     description: Inline JSON or the resolved absolute scanner-output path used by the action.
+  config-source:
+    description: Resolved Deloitte configuration file, or built-in defaults.
   summary-file:
     description: Absolute path to the JSON summary file when summary-file is configured.
   notification-count:
@@ -92,6 +114,8 @@ outputs:
     description: Number of onboarding messages accepted by the configured notification gateway.
   notifications-file:
     description: Absolute path to the rendered onboarding-email JSON file when configured.
+  metrics-json:
+    description: Compact scanner, access, and notification adoption metrics.
 runs:
   using: node24
   main: dist/index.cjs

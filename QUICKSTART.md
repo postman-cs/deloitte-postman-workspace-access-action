@@ -10,7 +10,7 @@ This action expects two things from the existing onboarding flow:
 Clone the immutable release and install the complete starter kit into Deloitte's pipeline repository:
 
 ```bash
-git clone --branch v0.4.0 --depth 1 \
+git clone --branch v0.5.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 ./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
@@ -22,12 +22,15 @@ The installer adds:
 ```text
 .github/actions/deloitte-postman-workspace-access/  # pinned runnable action
 .github/workflows/deloitte-postman-workspace-access.yml  # reusable preview/apply workflow
+.github/workflows/deloitte-postman-pending-reconcile.yml # optional scheduled completion
+.deloitte-postman.yml                             # central, upgrade-safe policy
 scripts/deloitte-postman-doctor.sh                  # read-only preflight
 docs/deloitte-postman-workspace-access.md           # Sharooq's runbook
 docs/deloitte-postman-prerequisites.md              # Postman and scanner checklist
 docs/deloitte-postman-sandbox-smoke.md              # controlled tenant test
 docs/deloitte-postman-notifications.md               # Deloitte mail-gateway contract
 docs/deloitte-postman-onboarding-email.md            # ready-to-review email template
+docs/deloitte-postman-logic-app/                     # Office 365 email adapter
 ```
 
 It refuses to overwrite an existing installation. Use `--upgrade` only when intentionally replacing starter-kit-owned files.
@@ -66,7 +69,9 @@ The smallest accepted payload is:
 }
 ```
 
-The action also accepts GitHub's native `permissions` object, known `scimId` values, and explicit `workspaceRole` values. Custom GitHub roles fall back to their highest mapped base permission; an otherwise unmapped collaborator receives `Viewer`. Every record still needs a valid corporate email because Postman SCIM is email-addressed. See `examples/deloitte-scanner-output.json` for the full shape.
+The action also accepts GitHub's native `permissions` object, known `scimId` values, and explicit `workspaceRole` values. Custom GitHub roles fall back to their highest mapped base permission; an otherwise unmapped collaborator receives `Viewer`. Postman SCIM is email-addressed, so a record needs either a corporate email or a GitHub login found in the configured JSON/CSV identity map. See `examples/deloitte-scanner-output.json` for the full shape.
+
+The installed default processes resolvable contributors even when another record lacks an email. Review `unresolved-count` and `unresolved-json`; set `scanner.invalidMemberPolicy: fail` for strict all-or-nothing validation.
 
 Name an artifact file `deloitte-github-scanner-output.json`, `github-scanner-output.json`, or `scanner-output.json` and the installed workflow will find it recursively. Multiple matches fail with an explicit error.
 
@@ -77,7 +82,7 @@ Use this when the consumer repository is allowed to run private actions from `po
 ```yaml
 - name: Reconcile Deloitte workspace access
   id: deloitte-access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.4.0
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.5.0
   with:
     workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-json: ${{ steps['github-scanner'].outputs['members-json'] }}
@@ -93,7 +98,7 @@ Use this when the consumer repository is allowed to run private actions from `po
 Use this when Deloitte wants the runnable bundle in the same repository as its pipeline:
 
 ```bash
-git clone --branch v0.4.0 --depth 1 \
+git clone --branch v0.5.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 cd deloitte-postman-workspace-access-action
@@ -158,11 +163,26 @@ Set `fail-on-pending-invites: 'true'` if pending users should block the pipeline
 
 The installed reusable workflow adds a human-readable per-user job summary and uploads the complete JSON result as a GitHub Actions artifact.
 
+Enable `.github/workflows/deloitte-postman-pending-reconcile.yml` after setting repository variables `POSTMAN_WORKSPACE_ID` and `DELOITTE_PENDING_RECONCILIATION_ENABLED=true`. It periodically reuses the latest successful scanner artifact so accepted invitations receive their workspace role without a manual rerun. Set `DELOITTE_SCANNER_WORKFLOW` and `DELOITTE_SCANNER_ARTIFACT` repository variables only when the defaults do not match Deloitte's scanner. Manual dispatch remains available before the schedule is enabled.
+
 ## 6. Deliver explicit onboarding email
 
 Postman sends a native team invitation only for some identity states. To notify everyone consistently, configure Deloitte's approved mail gateway secrets and pass the exact `postman-workspace-url`. The action renders one HTML/plain-text message per unique scanner email and sends one idempotent batch after reconciliation. Gateway rejection fails the job; dry runs never send.
 
 See `docs/deloitte-postman-notifications.md` for the request contract and `docs/deloitte-postman-onboarding-email.md` for the installed template.
+
+For Office 365, import the installed Logic Apps workflow and bind Deloitte's approved connection. After protecting the trigger and setting an allowed-domain list, run exactly one guarded delivery check:
+
+```bash
+export DELOITTE_NOTIFICATION_WEBHOOK_URL
+export DELOITTE_NOTIFICATION_WEBHOOK_TOKEN
+
+./.github/actions/deloitte-postman-workspace-access/dist/cli.cjs notify-test \
+  --email sharooq@deloitte.com \
+  --workspace-id "${POSTMAN_WORKSPACE_ID}" \
+  --allowed-domain deloitte.com \
+  --confirm SEND_TEST_NOTIFICATION
+```
 
 ## 7. Complete the protected sandbox smoke test
 

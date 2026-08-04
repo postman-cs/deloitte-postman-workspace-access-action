@@ -38,7 +38,7 @@ describe('Sharooq starter-kit contract', () => {
     expect(workflow.on.workflow_call.secrets.POSTMAN_API_KEY?.required).toBe(true);
     expect(workflow.on.workflow_call.secrets.POSTMAN_SCIM_API_KEY?.required).toBe(true);
     expect(workflow.on.workflow_call.inputs['scanner-artifact']?.required).toBe(false);
-    expect(workflow.on.workflow_call.inputs['default-workspace-role']?.default).toBe('Viewer');
+    expect(workflow.on.workflow_call.inputs['default-workspace-role']?.default).toBe('');
     expect(workflow.on.workflow_call.secrets.DELOITTE_NOTIFICATION_WEBHOOK_URL?.required).toBe(false);
     expect(workflow.on.workflow_call.secrets.DELOITTE_NOTIFICATION_WEBHOOK_TOKEN?.required).toBe(false);
     expect(workflow.jobs.reconcile.steps.some(
@@ -53,6 +53,18 @@ describe('Sharooq starter-kit contract', () => {
     expect(action?.with?.['notification-webhook-url']).toBe('${{ secrets.DELOITTE_NOTIFICATION_WEBHOOK_URL }}');
     expect(action?.with?.['notifications-file']).toBe('.deloitte-postman/notifications.json');
     expect(source).toContain('notification-delivered-count');
+  });
+
+  it('centralizes onboarding policy and ships pending reconciliation', () => {
+    expect(workflow.on.workflow_call.inputs['config-file']?.default).toBe('.deloitte-postman.yml');
+    expect(workflow.on.workflow_call.inputs['scanner-search-root']?.default).toBe('');
+    const pending = readFileSync('templates/deloitte-postman-pending-reconcile.yml', 'utf8');
+    expect(pending).toContain('schedule:');
+    expect(pending).toContain("DELOITTE_PENDING_RECONCILIATION_ENABLED == 'true'");
+    expect(pending).toContain('Download latest successful scanner artifact');
+    expect(pending).not.toContain('notification-webhook-url');
+    expect(readFileSync('templates/logic-app/deloitte-postman-notifier.workflow.json', 'utf8'))
+      .toContain('Deloitte_Postman_notification_batch');
   });
 
   it('documents pull-request preview and main-branch apply for Sharooq', () => {

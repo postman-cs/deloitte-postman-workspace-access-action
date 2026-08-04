@@ -36,7 +36,12 @@ async function runAction(entrypoint, directory, baseUrl, workspaceId, members, o
       'INPUT_WORKSPACE-ID': workspaceId,
       'INPUT_MEMBERS-JSON': options.autoDiscover ? '' : JSON.stringify(members),
       'INPUT_MEMBERS-FILE': '',
+      'INPUT_CONFIG-FILE': options.configFile ?? '',
       'INPUT_SCANNER-SEARCH-ROOT': options.scannerSearchRoot ?? '',
+      'INPUT_IDENTITY-MAP-FILE': options.identityMapFile ?? '',
+      'INPUT_INVALID-MEMBER-POLICY': options.invalidMemberPolicy ?? '',
+      'INPUT_EXCLUDE-BOTS': options.excludeBots ? 'true' : '',
+      'INPUT_EXCLUDE-LOGINS-JSON': options.excludeLogins ? JSON.stringify(options.excludeLogins) : '',
       'INPUT_ROLE-MAP-JSON': options.roleMap ? JSON.stringify(options.roleMap) : '',
       'INPUT_DEFAULT-WORKSPACE-ROLE': options.defaultWorkspaceRole ?? '',
       'INPUT_POSTMAN-API-KEY': POSTMAN_KEY,
@@ -82,6 +87,11 @@ try {
     assert.equal(action.outputs['invited-count'], '2');
     assert.equal(action.outputs['pending-count'], '0');
     assert.equal(action.outputs['failed-count'], '0');
+    assert.equal(action.outputs['detected-count'], '3');
+    assert.equal(action.outputs['resolved-count'], '3');
+    assert.equal(action.outputs['unresolved-count'], '0');
+    assert.equal(action.outputs['excluded-count'], '0');
+    assert.equal(JSON.parse(action.outputs['metrics-json']).access.added, 3);
     assert.deepEqual(JSON.parse(action.outputs['summary-json']).counts, {
       added: 3, invited: 2, pending: 0, skipped: 0, failed: 0
     });
@@ -172,6 +182,22 @@ try {
     assert.equal(discovered.outputs['added-count'], '1');
     assert.equal(discovered.outputs['scanner-source'], join(discoveryRoot, 'deloitte-github-scanner-output.json'));
     assert.match(discovered.stdout, /Auto-discovered scanner output/);
+
+    const resilient = await runAction('dist/index.cjs', directory, simulator.baseUrl, 'workspace-action-resilient', [
+      { login: 'valid', email: 'action.current@example.com', permission: 'read' },
+      { login: 'missing-email', permission: 'read' },
+      { login: 'dependabot[bot]', type: 'Bot', permission: 'write' }
+    ], {
+      label: 'resilient',
+      scenario: 'action-resilient',
+      excludeBots: true
+    });
+    assert.equal(resilient.code, 0, resilient.stderr);
+    assert.equal(resilient.outputs['detected-count'], '3');
+    assert.equal(resilient.outputs['resolved-count'], '1');
+    assert.equal(resilient.outputs['unresolved-count'], '1');
+    assert.equal(resilient.outputs['excluded-count'], '1');
+    assert.equal(JSON.parse(resilient.outputs['unresolved-json'])[0].githubLogin, 'missing-email');
 
     const missingInputPath = join(directory, 'missing-input-output.txt');
     const missingSummaryPath = join(directory, 'missing-input-summary.md');

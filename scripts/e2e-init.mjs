@@ -28,7 +28,7 @@ try {
 
     const install = await runProcess('bash', ['scripts/deloitte-init.sh', consumer]);
     assert.equal(install.code, 0, install.stderr);
-    assert.match(install.stdout, /Installed Deloitte Postman workspace access starter kit/);
+    assert.match(install.stdout, /"mode": "installed"/);
 
     const actionRoot = join(consumer, '.github/actions/deloitte-postman-workspace-access');
     const workflowPath = join(consumer, '.github/workflows/deloitte-postman-workspace-access.yml');
@@ -38,6 +38,9 @@ try {
     const sandboxSmokePath = join(consumer, 'docs/deloitte-postman-sandbox-smoke.md');
     const notificationsPath = join(consumer, 'docs/deloitte-postman-notifications.md');
     const emailTemplatePath = join(consumer, 'docs/deloitte-postman-onboarding-email.md');
+    const configPath = join(consumer, '.deloitte-postman.yml');
+    const pendingWorkflowPath = join(consumer, '.github/workflows/deloitte-postman-pending-reconcile.yml');
+    const logicAppPath = join(consumer, 'docs/deloitte-postman-logic-app/deloitte-postman-notifier.workflow.json');
     await Promise.all([
       access(join(actionRoot, 'action.yml')),
       access(join(actionRoot, 'dist/index.cjs')),
@@ -49,6 +52,9 @@ try {
       access(sandboxSmokePath),
       access(notificationsPath),
       access(emailTemplatePath)
+      , access(configPath)
+      , access(pendingWorkflowPath)
+      , access(logicAppPath)
     ]);
 
     const workflow = parse(await readFile(workflowPath, 'utf8'));
@@ -89,13 +95,21 @@ try {
     assert.equal(JSON.parse(validate.stdout).scanner.uniqueMembers, 2);
 
     const reinstall = await runProcess('bash', ['scripts/deloitte-init.sh', consumer]);
-    assert.equal(reinstall.code, 73);
+    assert.equal(reinstall.code, 1);
     assert.match(reinstall.stderr, /already exists/);
 
     await writeFile(runbookPath, 'stale\n');
+    await writeFile(configPath, 'schemaVersion: 1\nsourceRepository: deloitte/preserved\n');
     const upgrade = await runProcess('bash', ['scripts/deloitte-init.sh', consumer, '--upgrade']);
     assert.equal(upgrade.code, 0, upgrade.stderr);
     assert.match(await readFile(runbookPath, 'utf8'), /Sharooq's operating path/);
+    assert.match(await readFile(configPath, 'utf8'), /deloitte\/preserved/);
+
+    const configValidation = await runProcess(process.execPath, [
+      join(actionRoot, 'dist/cli.cjs'), 'config', 'validate', '--config-file', configPath
+    ], { cwd: consumer });
+    assert.equal(configValidation.code, 0, configValidation.stderr);
+    assert.equal(JSON.parse(configValidation.stdout).ok, true);
   });
 
   process.stdout.write('Sharooq starter kit e2e: install, credential-free validation, doctor, workflow, protection, and upgrade passed.\n');

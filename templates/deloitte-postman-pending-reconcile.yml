@@ -1,0 +1,57 @@
+name: Deloitte Postman pending access reconciliation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 13 * * *'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deloitte-postman-pending-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.DELOITTE_PENDING_RECONCILIATION_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pipeline repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download latest successful scanner artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCANNER_WORKFLOW: ${{ vars.DELOITTE_SCANNER_WORKFLOW }}
+          SCANNER_ARTIFACT: ${{ vars.DELOITTE_SCANNER_ARTIFACT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow="${SCANNER_WORKFLOW:-github-scanner.yml}"
+          artifact="${SCANNER_ARTIFACT:-github-scanner-output}"
+          run_id="$(gh run list --workflow "${workflow}" --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
+          test -n "${run_id}"
+          mkdir -p .deloitte-postman/scanner
+          gh run download "${run_id}" --name "${artifact}" --dir .deloitte-postman/scanner
+
+      - name: Complete accepted invitations
+        uses: ./.github/actions/deloitte-postman-workspace-access
+        with:
+          workspace-id: ${{ vars.POSTMAN_WORKSPACE_ID }}
+          scanner-search-root: .deloitte-postman/scanner
+          config-file: .deloitte-postman.yml
+          postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+          postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
+          fail-on-pending-invites: 'false'
+          summary-file: .deloitte-postman/pending-summary.json
+
+      - name: Upload reconciliation evidence
+        if: ${{ always() && hashFiles('.deloitte-postman/pending-summary.json') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deloitte-postman-pending-${{ github.run_id }}
+          path: .deloitte-postman/pending-summary.json
+          retention-days: 14
+          if-no-files-found: error

@@ -31,10 +31,14 @@
   "$defs": {
     "member": {
       "type": "object",
-      "required": ["email"],
+      "anyOf": [
+        { "required": ["email"] },
+        { "required": ["login"] }
+      ],
       "properties": {
         "email": { "type": "string", "format": "email" },
         "login": { "type": "string" },
+        "type": { "type": "string" },
         "externalId": { "type": ["string", "number"] },
         "external_id": { "type": ["string", "number"] },
         "scimId": { "type": ["string", "number"] },

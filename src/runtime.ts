@@ -1,8 +1,15 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 
-import { parseMembersJson, parseRoleMap } from './contracts.js';
-import type { NormalizedMember, ReconcileSummary, ValidationReport } from './types.js';
+import { parseMembersReport, parseRoleMap } from './contracts.js';
+import type { MemberParsingOptions } from './contracts.js';
+import type {
+  ExcludedScannerMember,
+  NormalizedMember,
+  ReconcileSummary,
+  ScannerIssue,
+  ValidationReport
+} from './types.js';
 
 const SCANNER_FILENAMES = new Set([
   'deloitte-github-scanner-output.json',
@@ -12,7 +19,10 @@ const SCANNER_FILENAMES = new Set([
 const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules']);
 
 export interface ResolvedMembersInput {
+  detected: number;
   members: NormalizedMember[];
+  unresolved: ScannerIssue[];
+  excluded: ExcludedScannerMember[];
   source: string;
   discovered: boolean;
 }
@@ -56,7 +66,8 @@ export async function resolveMembersInput(
   membersFile: string | undefined,
   roleMapJson: string | undefined,
   scannerSearchRoot?: string,
-  defaultWorkspaceRole?: string
+  defaultWorkspaceRole?: string,
+  memberOptions: Omit<MemberParsingOptions, 'defaultWorkspaceRole'> = {}
 ): Promise<ResolvedMembersInput> {
   const inline = membersJson?.trim();
   const explicitPath = membersFile?.trim();
@@ -64,8 +75,15 @@ export async function resolveMembersInput(
   const discovered = !inline && !explicitPath;
   const path = explicitPath ?? (discovered ? await discoverMembersFile(scannerSearchRoot) : undefined);
   const source = inline ?? await readFile(path as string, 'utf8');
+  const report = parseMembersReport(source, parseRoleMap(roleMapJson), {
+    ...(defaultWorkspaceRole ? { defaultWorkspaceRole } : {}),
+    ...memberOptions
+  });
   return {
-    members: parseMembersJson(source, parseRoleMap(roleMapJson), defaultWorkspaceRole),
+    detected: report.detected,
+    members: report.members,
+    unresolved: report.unresolved,
+    excluded: report.excluded,
     source: inline ? 'inline JSON' : resolve(path as string),
     discovered
   };
@@ -77,7 +95,12 @@ export function formatSummary(summary: unknown): string {
 
 export function buildValidationReport(
   members: NormalizedMember[],
-  source: string
+  source: string,
+  resolution: {
+    detected?: number;
+    unresolved?: ScannerIssue[];
+    excluded?: ExcludedScannerMember[];
+  } = {}
 ): ValidationReport {
   const workspaceRoles: Record<string, number> = {};
   for (const member of members) {
@@ -88,9 +111,12 @@ export function buildValidationReport(
     ok: true,
     scanner: {
       source,
+      detected: resolution.detected ?? members.length,
       uniqueMembers: members.length,
       withScimId,
-      requiringScimLookup: members.length - withScimId
+      requiringScimLookup: members.length - withScimId,
+      unresolved: resolution.unresolved?.length ?? 0,
+      excluded: resolution.excluded?.length ?? 0
     },
     workspaceRoles,
     members: members.map((member) => ({
@@ -99,7 +125,9 @@ export function buildValidationReport(
       ...(member.githubPermission ? { githubPermission: member.githubPermission } : {}),
       ...(member.githubLogin ? { githubLogin: member.githubLogin } : {}),
       hasScimId: Boolean(member.scimId)
-    }))
+    })),
+    unresolved: resolution.unresolved ?? [],
+    excluded: resolution.excluded ?? []
   };
 }
 

@@ -28,7 +28,12 @@ describe('GitHub Action contract', () => {
     expect(Object.keys(action.inputs ?? {})).toEqual(expect.arrayContaining([
       'members-json',
       'members-file',
+      'config-file',
       'scanner-search-root',
+      'identity-map-file',
+      'invalid-member-policy',
+      'exclude-bots',
+      'exclude-logins-json',
       'role-map-json',
       'default-workspace-role',
       'summary-file',
@@ -45,14 +50,21 @@ describe('GitHub Action contract', () => {
       'invited-count',
       'pending-count',
       'failed-count',
+      'detected-count',
+      'resolved-count',
+      'unresolved-count',
+      'excluded-count',
+      'unresolved-json',
       'scanner-source',
+      'config-source',
       'summary-file',
       'notification-count',
       'notification-eligible-count',
       'notification-delivered-count',
-      'notifications-file'
+      'notifications-file',
+      'metrics-json'
     ]));
-    expect(() => JSON.parse(action.inputs?.['role-map-json']?.default ?? '')).not.toThrow();
-    expect(action.inputs?.['default-workspace-role']?.default).toBe('Viewer');
+    expect(action.inputs?.['role-map-json']?.default).toBeUndefined();
+    expect(action.inputs?.['default-workspace-role']?.default).toBeUndefined();
   });
 });
