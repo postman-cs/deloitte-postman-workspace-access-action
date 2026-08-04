@@ -19,7 +19,7 @@ inputs:
     required: false
     default: .
   role-map-json:
-    description: JSON map of GitHub permission names to Postman workspace role display names.
+    description: JSON overrides or extensions mapping GitHub permission names to Postman workspace role display names.
     required: false
     default: '{"admin":"Admin","maintain":"Editor","write":"Editor","push":"Editor","triage":"Viewer","read":"Viewer","pull":"Viewer"}'
   postman-api-key:
