@@ -30,14 +30,19 @@ await withTempDir('deloitte-release-e2e-', async (directory) => {
   const sbom = files.find((file) => file.endsWith(`-${tag}.cdx.json`));
   const manifest = files.find((file) => file.endsWith(`-${tag}.manifest.json`));
   assert(starterKit && npmPackage && sbom && manifest);
+  assert(files.includes('README.md'));
+  assert(files.includes('BUILD_LOG.md'));
 
   const sbomJson = JSON.parse(await readFile(join(directory, sbom), 'utf8'));
   assert.equal(sbomJson.bomFormat, 'CycloneDX');
   const manifestJson = JSON.parse(await readFile(join(directory, manifest), 'utf8'));
   assert.equal(manifestJson.version, version);
+  assert.equal(manifestJson.readme, 'README.md');
+  assert.equal(manifestJson.buildLog, 'BUILD_LOG.md');
+  assert.match(await readFile(join(directory, 'BUILD_LOG.md'), 'utf8'), new RegExp(tag.replaceAll('.', '\\.'), 'u'));
 
   const checksumLines = (await readFile(join(directory, 'SHA256SUMS'), 'utf8')).trim().split('\n');
-  assert.equal(checksumLines.length, 4);
+  assert.equal(checksumLines.length, 6);
   for (const line of checksumLines) {
     const [expected, file] = line.split(/\s{2}/);
     const actual = createHash('sha256').update(await readFile(join(directory, file))).digest('hex');
@@ -47,8 +52,10 @@ await withTempDir('deloitte-release-e2e-', async (directory) => {
   const archive = await runProcess('tar', ['-tzf', join(directory, starterKit)]);
   assert.equal(archive.code, 0, archive.stderr);
   assert.match(archive.stdout, /scripts\/deloitte-init\.sh/);
+  assert.match(archive.stdout, /README\.md/);
+  assert.match(archive.stdout, /BUILD_LOG\.md/);
   assert.match(archive.stdout, /docs\/POSTMAN-PREREQUISITES\.md/);
   assert.match(archive.stdout, /templates\/deloitte-postman-workspace-access\.yml/);
 });
 
-process.stdout.write('Release e2e: version gate, starter kit, package, SBOM, manifest, and checksums passed.\n');
+process.stdout.write('Release e2e: README, build log, starter kit, package, SBOM, manifest, and checksums passed.\n');

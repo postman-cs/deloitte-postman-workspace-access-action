@@ -10,12 +10,12 @@ Plug-and-play workspace membership for API onboarding pipelines. Feed the action
 
 The implementation uses the public Postman [SCIM create-user API](https://learning.postman.com/api-docs/api-reference/scim/create-scim-user) and [workspace-role API](https://learning.postman.com/api-docs/api-reference/workspaces/update-workspace-roles). Workspace role updates use SCIM IDs, so the scanner never needs to know Postman-internal user IDs.
 
-For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). Sharooq's one-command installer adds the pinned action, reusable workflow, read-only doctor, and operations runbook to Deloitte's pipeline repository.
+For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). Sharooq's one-command installer adds the pinned action, reusable workflow, read-only doctor, and operations runbook to Deloitte's pipeline repository. See [BUILD_LOG.md](BUILD_LOG.md) for the release gates and verification evidence.
 
 ## Sharooq's golden path
 
 ```bash
-git clone --branch v0.3.0 --depth 1 \
+git clone --branch v0.3.1 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 ./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
@@ -56,7 +56,7 @@ Validation checks emails and permission mapping, normalizes duplicate emails, an
 
 - name: Reconcile workspace access
   id: access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.3.0
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.3.1
   with:
     workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-json: ${{ steps['github-scanner'].outputs['members-json'] }}

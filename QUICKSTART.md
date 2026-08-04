@@ -10,7 +10,7 @@ This action expects two things from the existing onboarding flow:
 Clone the immutable release and install the complete starter kit into Deloitte's pipeline repository:
 
 ```bash
-git clone --branch v0.3.0 --depth 1 \
+git clone --branch v0.3.1 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 ./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
@@ -73,7 +73,7 @@ Use this when the consumer repository is allowed to run private actions from `po
 ```yaml
 - name: Reconcile Deloitte workspace access
   id: deloitte-access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.3.0
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.3.1
   with:
     workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-json: ${{ steps['github-scanner'].outputs['members-json'] }}
@@ -86,7 +86,7 @@ Use this when the consumer repository is allowed to run private actions from `po
 Use this when Deloitte wants the runnable bundle in the same repository as its pipeline:
 
 ```bash
-git clone --branch v0.3.0 --depth 1 \
+git clone --branch v0.3.1 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 cd deloitte-postman-workspace-access-action

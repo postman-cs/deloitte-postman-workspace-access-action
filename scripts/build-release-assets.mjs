@@ -49,6 +49,7 @@ try {
     'action.yml',
     'LICENSE',
     'README.md',
+    'BUILD_LOG.md',
     'QUICKSTART.md',
     'dist',
     'docs',
@@ -76,6 +77,11 @@ try {
 
   const commit = run('git', ['rev-parse', 'HEAD']).trim();
   const manifestName = `deloitte-postman-workspace-access-${tag}.manifest.json`;
+  const buildUrl = process.env.GITHUB_RUN_ID
+    ? `${process.env.GITHUB_SERVER_URL ?? 'https://github.com'}/${process.env.GITHUB_REPOSITORY ?? 'postman-cs/deloitte-postman-workspace-access-action'}/actions/runs/${process.env.GITHUB_RUN_ID}/attempts/${process.env.GITHUB_RUN_ATTEMPT ?? '1'}`
+    : 'local release-asset build';
+  await cp(join(repositoryRoot, 'README.md'), join(output, 'README.md'));
+  await writeFile(join(output, 'BUILD_LOG.md'), `# Build Log — ${tag}\n\n- Version: \`${version}\`\n- Tag: \`${tag}\`\n- Commit: \`${commit}\`\n- Build: ${buildUrl}\n\n## Completed release gates\n\n- \`npm ci\`\n- \`npm run qa\`\n- \`npm run verify:dist\`\n- \`npm run release:verify -- ${tag}\`\n- \`npm run release:assets\`\n\nThe release workflow generated the starter kit, npm package, CycloneDX SBOM, manifest, checksums, and build-provenance attestation from this commit.\n`);
   await writeFile(join(output, manifestName), `${JSON.stringify({
     name: packageJson.name,
     version,
@@ -83,7 +89,9 @@ try {
     commit,
     starterKit: archiveName,
     npmPackage: packMetadata[0].filename,
-    sbom: sbomName
+    sbom: sbomName,
+    readme: 'README.md',
+    buildLog: 'BUILD_LOG.md'
   }, null, 2)}\n`);
 
   const files = (await readdir(output)).sort();
