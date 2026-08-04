@@ -36,6 +36,8 @@ try {
     const runbookPath = join(consumer, 'docs/deloitte-postman-workspace-access.md');
     const prerequisitesPath = join(consumer, 'docs/deloitte-postman-prerequisites.md');
     const sandboxSmokePath = join(consumer, 'docs/deloitte-postman-sandbox-smoke.md');
+    const notificationsPath = join(consumer, 'docs/deloitte-postman-notifications.md');
+    const emailTemplatePath = join(consumer, 'docs/deloitte-postman-onboarding-email.md');
     await Promise.all([
       access(join(actionRoot, 'action.yml')),
       access(join(actionRoot, 'dist/index.cjs')),
@@ -44,7 +46,9 @@ try {
       access(doctorPath, constants.X_OK),
       access(runbookPath),
       access(prerequisitesPath),
-      access(sandboxSmokePath)
+      access(sandboxSmokePath),
+      access(notificationsPath),
+      access(emailTemplatePath)
     ]);
 
     const workflow = parse(await readFile(workflowPath, 'utf8'));

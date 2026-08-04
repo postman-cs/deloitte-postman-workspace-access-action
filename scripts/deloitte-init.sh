@@ -28,6 +28,8 @@ doctor_path="${consumer_root}/scripts/deloitte-postman-doctor.sh"
 runbook_path="${consumer_root}/docs/deloitte-postman-workspace-access.md"
 prerequisites_path="${consumer_root}/docs/deloitte-postman-prerequisites.md"
 sandbox_smoke_path="${consumer_root}/docs/deloitte-postman-sandbox-smoke.md"
+notifications_path="${consumer_root}/docs/deloitte-postman-notifications.md"
+email_template_path="${consumer_root}/docs/deloitte-postman-onboarding-email.md"
 
 owned_paths=(
   "${action_root}"
@@ -36,6 +38,8 @@ owned_paths=(
   "${runbook_path}"
   "${prerequisites_path}"
   "${sandbox_smoke_path}"
+  "${notifications_path}"
+  "${email_template_path}"
 )
 if [[ "${upgrade}" == false ]]; then
   for path in "${owned_paths[@]}"; do
@@ -58,10 +62,13 @@ cp "${source_root}/templates/deloitte-postman-doctor.sh" "${doctor_path}"
 cp "${source_root}/docs/SHAROOQ-RUNBOOK.md" "${runbook_path}"
 cp "${source_root}/docs/POSTMAN-PREREQUISITES.md" "${prerequisites_path}"
 cp "${source_root}/docs/SANDBOX-SMOKE.md" "${sandbox_smoke_path}"
+cp "${source_root}/docs/NOTIFICATIONS.md" "${notifications_path}"
+cp "${source_root}/templates/deloitte-postman-onboarding-email.md" "${email_template_path}"
 chmod +x "${action_root}/dist/cli.cjs" "${doctor_path}"
 
 echo "Installed Deloitte Postman workspace access starter kit in ${consumer_root}"
 echo "Next:"
 echo "  1. Add POSTMAN_API_KEY and POSTMAN_SCIM_API_KEY as GitHub Actions secrets."
-echo "  2. Run scripts/deloitte-postman-doctor.sh --workspace-id <id>."
-echo "  3. Copy the caller job from docs/deloitte-postman-workspace-access.md into the onboarding pipeline."
+echo "  2. Add DELOITTE_NOTIFICATION_WEBHOOK_URL and its optional token to deliver onboarding email."
+echo "  3. Run scripts/deloitte-postman-doctor.sh --workspace-id <id>."
+echo "  4. Copy the caller job from docs/deloitte-postman-workspace-access.md into the onboarding pipeline."

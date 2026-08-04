@@ -39,9 +39,11 @@ try {
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/schemas/deloitte-github-scanner-output.schema.json'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/scripts/deloitte-init.sh'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/templates/deloitte-postman-workspace-access.yml'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/templates/deloitte-postman-onboarding-email.md'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/docs/SHAROOQ-RUNBOOK.md'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/docs/POSTMAN-PREREQUISITES.md'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/docs/SANDBOX-SMOKE.md'));
+    await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/docs/NOTIFICATIONS.md'));
     await readFile(join(packageRoot, 'node_modules/@postman-cse/deloitte-workspace-access/SECURITY.md'));
 
     const packagedConsumer = join(directory, 'packaged-consumer');

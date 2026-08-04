@@ -30,7 +30,12 @@ describe('GitHub Action contract', () => {
       'members-file',
       'scanner-search-root',
       'role-map-json',
+      'default-workspace-role',
       'summary-file',
+      'notifications-file',
+      'notification-webhook-url',
+      'notification-webhook-token',
+      'postman-workspace-url',
       'dry-run',
       'fail-on-pending-invites'
     ]));
@@ -41,8 +46,13 @@ describe('GitHub Action contract', () => {
       'pending-count',
       'failed-count',
       'scanner-source',
-      'summary-file'
+      'summary-file',
+      'notification-count',
+      'notification-eligible-count',
+      'notification-delivered-count',
+      'notifications-file'
     ]));
     expect(() => JSON.parse(action.inputs?.['role-map-json']?.default ?? '')).not.toThrow();
+    expect(action.inputs?.['default-workspace-role']?.default).toBe('Viewer');
   });
 });

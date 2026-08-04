@@ -94,6 +94,25 @@ describe('scanner contract', () => {
     ]), { ...DEFAULT_ROLE_MAP })).toThrow(/not present in role-map-json/);
   });
 
+  it('assigns the inclusive fallback role to otherwise unmapped collaborators', () => {
+    const members = parseMembersJson(JSON.stringify([
+      { email: 'specialist@example.com', role_name: 'deloitte-api-specialist' },
+      { email: 'contributor@example.com' }
+    ]), { ...DEFAULT_ROLE_MAP }, 'Viewer');
+
+    expect(members).toEqual([
+      expect.objectContaining({
+        email: 'specialist@example.com',
+        githubPermission: 'deloitte-api-specialist',
+        workspaceRole: 'Viewer'
+      }),
+      expect.objectContaining({
+        email: 'contributor@example.com',
+        workspaceRole: 'Viewer'
+      })
+    ]);
+  });
+
   it('validates role map JSON', () => {
     expect(parseRoleMap('{"owner":"Admin","read":"Editor"}')).toEqual({
       ...DEFAULT_ROLE_MAP,

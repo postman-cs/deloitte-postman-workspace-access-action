@@ -130,7 +130,7 @@ function unwrapMembers(value) {
   }
   throw new Error("Members input must be an array or an object with a members/collaborators array.");
 }
-function parseMembersJson(value, roleMap) {
+function parseMembersJson(value, roleMap, defaultWorkspaceRole) {
   let parsed;
   try {
     parsed = JSON.parse(value);
@@ -155,7 +155,8 @@ function parseMembersJson(value, roleMap) {
     );
     const candidates = permissionCandidates(member);
     const permission = candidates.find((candidate) => roleMap[candidate]);
-    const workspaceRole = explicitRole ?? (permission ? roleMap[permission] : void 0);
+    const fallbackRole = optionalString(defaultWorkspaceRole);
+    const workspaceRole = explicitRole ?? (permission ? roleMap[permission] : void 0) ?? fallbackRole;
     if (!workspaceRole) {
       throw new Error(
         `Member ${email} has no Postman workspace role and its GitHub permission is not present in role-map-json.`
@@ -171,7 +172,7 @@ function parseMembersJson(value, roleMap) {
       email,
       workspaceRole,
       ...githubLogin ? { githubLogin } : {},
-      ...permission ? { githubPermission: permission } : {},
+      ...permission ?? candidates[0] ? { githubPermission: permission ?? candidates[0] } : {},
       ...scimId ? { scimId } : {},
       ...externalId ? { externalId } : {},
       ...givenName ? { givenName } : {},
@@ -219,7 +220,7 @@ function asRecord(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 function sleep(milliseconds) {
-  return new Promise((resolve2) => setTimeout(resolve2, milliseconds));
+  return new Promise((resolve3) => setTimeout(resolve3, milliseconds));
 }
 function responseDelay(response, attempt) {
   const retryAfter = response.headers.get("retry-after");
@@ -592,9 +593,223 @@ async function diagnoseWorkspaceAccess(client, options, reporter) {
   };
 }
 
-// src/runtime.ts
+// src/notifications.ts
 var import_promises = require("node:fs/promises");
 var import_node_path = require("node:path");
+var DEFAULT_NOTIFICATION_SUBJECT = "Deloitte: Your Postman workspace access";
+var DEFAULT_POSTMAN_WORKSPACE_URL = "https://go.postman.co/";
+var RETRYABLE_STATUSES = /* @__PURE__ */ new Set([429, 500, 502, 503, 504]);
+function normalizeWorkspaceUrl(value) {
+  const candidate = value?.trim() || DEFAULT_POSTMAN_WORKSPACE_URL;
+  let url;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new Error("postman-workspace-url must be a valid HTTPS URL.");
+  }
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error("postman-workspace-url must be a credential-free HTTPS URL.");
+  }
+  return url.toString();
+}
+function normalizeSubject(value) {
+  const subject = (value?.trim() || DEFAULT_NOTIFICATION_SUBJECT).replaceAll(/[\r\n]+/g, " ").trim();
+  if (subject.length > 200) throw new Error("notification-subject must be 200 characters or fewer.");
+  return subject;
+}
+function escapeHtml(value) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+function notificationStatus(result) {
+  if (result.workspaceAccess === "pending") return "invitation-pending";
+  if (result.workspaceAccess === "would-add") return "preview";
+  if (result.workspaceAccess === "failed" || result.lifecycle === "failed") return "needs-attention";
+  return "ready";
+}
+function statusCopy(result) {
+  if (result.workspaceAccess === "pending") {
+    return {
+      headline: "Your Postman team invitation has been submitted.",
+      nextStep: "Accept the Postman invitation in your inbox. The pipeline can add your workspace access on its next run."
+    };
+  }
+  if (result.workspaceAccess === "would-add") {
+    return {
+      headline: "Your Postman onboarding is included in the current preview.",
+      nextStep: "No email is sent from a preview. The pipeline will provision access when the approved apply run starts."
+    };
+  }
+  if (result.workspaceAccess === "failed" || result.lifecycle === "failed") {
+    return {
+      headline: "Deloitte identified that you need Postman access, but this run could not finish it.",
+      nextStep: "The pipeline owner has the failure details and can safely retry your onboarding."
+    };
+  }
+  if (result.lifecycle === "provisioned") {
+    return {
+      headline: "Your Postman team membership and workspace access are ready.",
+      nextStep: "Sign in with your Deloitte email address, use Deloitte SSO if prompted, and open the workspace."
+    };
+  }
+  if (result.lifecycle === "reactivated") {
+    return {
+      headline: "Your Postman account was reactivated and your workspace access is ready.",
+      nextStep: "Sign in with your Deloitte email address and open the workspace."
+    };
+  }
+  return {
+    headline: "Your Postman workspace access is ready.",
+    nextStep: "Sign in with your Deloitte email address and open the workspace."
+  };
+}
+function repositoryCopy(sourceRepository) {
+  return sourceRepository ? `You were included in Postman onboarding because you were detected as a contributor to ${sourceRepository}.` : "You were included in Postman onboarding because you were detected as a contributor to a Deloitte GitHub repository.";
+}
+function renderText(result, workspaceUrl, sourceRepository) {
+  const copy = statusCopy(result);
+  return [
+    "Hello,",
+    "",
+    repositoryCopy(sourceRepository),
+    copy.headline,
+    "",
+    `Postman workspace role: ${result.workspaceRole}`,
+    `Next step: ${copy.nextStep}`,
+    `Open Postman: ${workspaceUrl}`,
+    "",
+    "Three useful ways to get started:",
+    "- Find and reuse the APIs, collections, and environments your repository depends on.",
+    "- Run collections locally or in CI to validate API behavior before merging.",
+    "- Collaborate in the workspace so API changes, examples, and tests stay discoverable.",
+    "",
+    "\u2014 Deloitte API Enablement"
+  ].join("\n");
+}
+function renderHtml(result, workspaceUrl, sourceRepository) {
+  const copy = statusCopy(result);
+  const safeUrl = escapeHtml(workspaceUrl);
+  return [
+    "<!doctype html>",
+    '<html><body style="margin:0;background:#f7f7f7;font-family:Arial,sans-serif;color:#212121">',
+    '<div style="max-width:640px;margin:24px auto;background:#ffffff;border:1px solid #e6e6e6;border-radius:12px;overflow:hidden">',
+    '<div style="height:8px;background:#ff6c37"></div>',
+    '<div style="padding:32px">',
+    '<p style="margin-top:0">Hello,</p>',
+    `<p>${escapeHtml(repositoryCopy(sourceRepository))}</p>`,
+    `<h2 style="color:#ff6c37">${escapeHtml(copy.headline)}</h2>`,
+    `<p><strong>Postman workspace role:</strong> ${escapeHtml(result.workspaceRole)}</p>`,
+    `<p><strong>Next step:</strong> ${escapeHtml(copy.nextStep)}</p>`,
+    `<p style="margin:28px 0"><a href="${safeUrl}" style="background:#ff6c37;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold">Open Postman</a></p>`,
+    "<h3>Get value from the workspace</h3>",
+    "<ul>",
+    "<li>Find and reuse the APIs, collections, and environments your repository depends on.</li>",
+    "<li>Run collections locally or in CI before merging API changes.</li>",
+    "<li>Keep API examples, tests, and collaboration discoverable for the whole team.</li>",
+    "</ul>",
+    '<p style="margin-bottom:0">\u2014 Deloitte API Enablement</p>',
+    "</div></div></body></html>"
+  ].join("");
+}
+function notificationFor(result, summary, options) {
+  return {
+    to: result.email,
+    subject: options.subject,
+    text: renderText(result, options.workspaceUrl, options.sourceRepository),
+    html: renderHtml(result, options.workspaceUrl, options.sourceRepository),
+    workspaceRole: result.workspaceRole,
+    lifecycle: result.lifecycle,
+    workspaceAccess: result.workspaceAccess,
+    status: notificationStatus(result),
+    send: !summary.dryRun && result.workspaceAccess !== "would-add"
+  };
+}
+function buildNotificationEnvelope(summary, options = {}) {
+  const workspaceUrl = normalizeWorkspaceUrl(options.workspaceUrl);
+  const subject = normalizeSubject(options.subject);
+  const sourceRepository = options.sourceRepository?.trim() || void 0;
+  return {
+    schemaVersion: 1,
+    kind: "deloitte-postman-onboarding",
+    workspace: { id: summary.workspaceId, url: workspaceUrl },
+    ...sourceRepository ? { sourceRepository } : {},
+    notifications: summary.results.map((result) => notificationFor(result, summary, {
+      workspaceUrl,
+      subject,
+      ...sourceRepository ? { sourceRepository } : {}
+    }))
+  };
+}
+async function writeNotificationEnvelope(path, envelope) {
+  const outputPath = (0, import_node_path.resolve)(path);
+  await (0, import_promises.mkdir)((0, import_node_path.dirname)(outputPath), { recursive: true });
+  await (0, import_promises.writeFile)(outputPath, `${JSON.stringify(envelope, null, 2)}
+`, { mode: 384 });
+  return outputPath;
+}
+function notificationEndpoint(value) {
+  let endpoint;
+  try {
+    endpoint = new URL(value);
+  } catch {
+    throw new Error("The notification webhook must be a valid HTTPS URL.");
+  }
+  const local = endpoint.hostname === "127.0.0.1" || endpoint.hostname === "localhost" || endpoint.hostname === "::1";
+  if (endpoint.protocol !== "https:" && !(local && endpoint.protocol === "http:")) {
+    throw new Error("The notification webhook must use HTTPS (HTTP is allowed only for localhost tests).");
+  }
+  if (endpoint.username || endpoint.password) {
+    throw new Error("The notification webhook URL must not contain credentials.");
+  }
+  return endpoint;
+}
+function validateNotificationConfiguration(options, webhookUrl) {
+  normalizeWorkspaceUrl(options.workspaceUrl);
+  normalizeSubject(options.subject);
+  if (webhookUrl?.trim()) notificationEndpoint(webhookUrl);
+}
+function retryDelay(response, attempt) {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter && /^\d+$/.test(retryAfter)) return Math.min(Number(retryAfter) * 1e3, 5e3);
+  return attempt * 250;
+}
+async function delay(milliseconds) {
+  await new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+}
+async function deliverNotificationEnvelope(envelope, options) {
+  const notifications = envelope.notifications.filter((notification) => notification.send);
+  if (notifications.length === 0) return 0;
+  const endpoint = notificationEndpoint(options.webhookUrl);
+  const token = options.token?.trim();
+  const idempotencyKey = options.idempotencyKey?.trim();
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const payload = { ...envelope, notifications };
+  const maxAttempts = idempotencyKey ? 3 : 1;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "user-agent": "deloitte-postman-workspace-access-action",
+        ...token ? { authorization: `Bearer ${token}` } : {},
+        ...idempotencyKey ? { "idempotency-key": idempotencyKey } : {}
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15e3)
+    });
+    if (response.ok) return notifications.length;
+    if (attempt < maxAttempts && RETRYABLE_STATUSES.has(response.status)) {
+      await delay(retryDelay(response, attempt));
+      continue;
+    }
+    throw new Error(`Notification gateway returned HTTP ${response.status}.`);
+  }
+  throw new Error("Notification gateway delivery failed.");
+}
+
+// src/runtime.ts
+var import_promises2 = require("node:fs/promises");
+var import_node_path2 = require("node:path");
 var SCANNER_FILENAMES = /* @__PURE__ */ new Set([
   "deloitte-github-scanner-output.json",
   "github-scanner-output.json",
@@ -602,9 +817,9 @@ var SCANNER_FILENAMES = /* @__PURE__ */ new Set([
 ]);
 var SKIPPED_DIRECTORIES = /* @__PURE__ */ new Set([".git", "node_modules"]);
 async function findScannerFiles(directory, results) {
-  const entries = await (0, import_promises.readdir)(directory, { withFileTypes: true });
+  const entries = await (0, import_promises2.readdir)(directory, { withFileTypes: true });
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
-    const path = (0, import_node_path.join)(directory, entry.name);
+    const path = (0, import_node_path2.join)(directory, entry.name);
     if (entry.isDirectory() && !SKIPPED_DIRECTORIES.has(entry.name)) {
       await findScannerFiles(path, results);
     } else if (entry.isFile() && SCANNER_FILENAMES.has(entry.name.toLowerCase())) {
@@ -613,7 +828,7 @@ async function findScannerFiles(directory, results) {
   }
 }
 async function discoverMembersFile(searchRoot = process.cwd()) {
-  const root = (0, import_node_path.resolve)(searchRoot);
+  const root = (0, import_node_path2.resolve)(searchRoot);
   const matches = [];
   try {
     await findScannerFiles(root, matches);
@@ -628,21 +843,21 @@ async function discoverMembersFile(searchRoot = process.cwd()) {
     );
   }
   if (matches.length > 1) {
-    const candidates = matches.map((path) => (0, import_node_path.relative)(root, path) || path).join(", ");
+    const candidates = matches.map((path) => (0, import_node_path2.relative)(root, path) || path).join(", ");
     throw new Error(`Multiple scanner outputs were found under ${root}: ${candidates}. Set members-file explicitly.`);
   }
   return matches[0];
 }
-async function resolveMembersInput(membersJson, membersFile, roleMapJson, scannerSearchRoot) {
+async function resolveMembersInput(membersJson, membersFile, roleMapJson, scannerSearchRoot, defaultWorkspaceRole) {
   const inline = membersJson?.trim();
   const explicitPath = membersFile?.trim();
   if (inline && explicitPath) throw new Error("Provide only one of members-json or members-file.");
   const discovered = !inline && !explicitPath;
   const path = explicitPath ?? (discovered ? await discoverMembersFile(scannerSearchRoot) : void 0);
-  const source = inline ?? await (0, import_promises.readFile)(path, "utf8");
+  const source = inline ?? await (0, import_promises2.readFile)(path, "utf8");
   return {
-    members: parseMembersJson(source, parseRoleMap(roleMapJson)),
-    source: inline ? "inline JSON" : (0, import_node_path.resolve)(path),
+    members: parseMembersJson(source, parseRoleMap(roleMapJson), defaultWorkspaceRole),
+    source: inline ? "inline JSON" : (0, import_node_path2.resolve)(path),
     discovered
   };
 }
@@ -690,7 +905,11 @@ Options:
   --members-json <json>             Inline scanner output JSON.
   --scanner-search-root <path>      Root used to auto-discover scanner output; defaults to current directory.
   --role-map-json <json>            Overrides/extensions for the default GitHub-to-Postman role map.
+  --default-workspace-role <role>   Role for otherwise unmapped collaborators; defaults to Viewer.
   --postman-base-url <url>          Defaults to https://api.postman.com.
+  --postman-workspace-url <url>     Link included in onboarding notifications.
+  --notification-subject <text>     Email subject used by the notification gateway.
+  --notifications-file <path>       Write rendered notification payloads to a JSON file.
   --dry-run                         Plan without writes.
   --fail-on-pending-invites         Exit non-zero while invitations are pending.
   --help                            Show this help.
@@ -698,6 +917,8 @@ Options:
 Environment:
   POSTMAN_API_KEY                    Required for doctor and reconciliation; not required for validate.
   POSTMAN_SCIM_API_KEY               Required for doctor and for users needing SCIM lookup/provisioning.
+  DELOITTE_NOTIFICATION_WEBHOOK_URL  Optional HTTPS endpoint that accepts the rendered email batch.
+  DELOITTE_NOTIFICATION_WEBHOOK_TOKEN Optional bearer token for the notification endpoint.
 `;
 async function runCli(argv = process.argv.slice(2)) {
   const command = argv[0] === "doctor" || argv[0] === "validate" ? argv[0] : "reconcile";
@@ -712,7 +933,11 @@ async function runCli(argv = process.argv.slice(2)) {
       "members-json": { type: "string" },
       "scanner-search-root": { type: "string", default: process.cwd() },
       "role-map-json": { type: "string", default: JSON.stringify(DEFAULT_ROLE_MAP) },
+      "default-workspace-role": { type: "string", default: "Viewer" },
       "postman-base-url": { type: "string", default: "https://api.postman.com" },
+      "postman-workspace-url": { type: "string" },
+      "notification-subject": { type: "string" },
+      "notifications-file": { type: "string" },
       "dry-run": { type: "boolean", default: false },
       "fail-on-pending-invites": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false }
@@ -726,7 +951,8 @@ async function runCli(argv = process.argv.slice(2)) {
     values["members-json"],
     values["members-file"],
     values["role-map-json"],
-    values["scanner-search-root"]
+    values["scanner-search-root"],
+    values["default-workspace-role"]
   );
   if (resolved.discovered) process.stderr.write(`info: Auto-discovered scanner output at ${resolved.source}.
 `);
@@ -739,6 +965,9 @@ async function runCli(argv = process.argv.slice(2)) {
   if (!workspaceId) throw new Error("--workspace-id is required.");
   const postmanApiKey = process.env.POSTMAN_API_KEY?.trim();
   if (!postmanApiKey) throw new Error("POSTMAN_API_KEY is required.");
+  const workspaceUrl = values["postman-workspace-url"];
+  const notificationSubject = values["notification-subject"];
+  const notificationWebhookUrl = process.env.DELOITTE_NOTIFICATION_WEBHOOK_URL?.trim();
   const client = new PostmanClient({
     postmanApiKey,
     ...process.env.POSTMAN_SCIM_API_KEY?.trim() ? { scimApiKey: process.env.POSTMAN_SCIM_API_KEY.trim() } : {},
@@ -759,16 +988,42 @@ async function runCli(argv = process.argv.slice(2)) {
 `);
     return report.ok ? 0 : 1;
   }
+  validateNotificationConfiguration({
+    ...workspaceUrl ? { workspaceUrl } : {},
+    ...notificationSubject ? { subject: notificationSubject } : {}
+  }, notificationWebhookUrl);
+  const dryRun = parseBoolean(String(values["dry-run"]));
   const summary = await reconcileWorkspaceAccess(client, {
     workspaceId,
     members: resolved.members,
-    dryRun: parseBoolean(String(values["dry-run"]))
+    dryRun
   }, {
     info: (message) => process.stderr.write(`info: ${message}
 `),
     warning: (message) => process.stderr.write(`warning: ${message}
 `)
   });
+  const sourceRepository = process.env.GITHUB_REPOSITORY ?? process.env.CI_PROJECT_PATH;
+  const notificationEnvelope = buildNotificationEnvelope(summary, {
+    ...workspaceUrl ? { workspaceUrl } : {},
+    ...sourceRepository ? { sourceRepository } : {},
+    ...notificationSubject ? { subject: notificationSubject } : {}
+  });
+  if (values["notifications-file"]) {
+    const notificationPath = await writeNotificationEnvelope(values["notifications-file"], notificationEnvelope);
+    process.stderr.write(`info: Wrote ${notificationEnvelope.notifications.length} onboarding notification(s) to ${notificationPath}.
+`);
+  }
+  if (notificationWebhookUrl) {
+    const runId = process.env.GITHUB_RUN_ID?.trim() ?? process.env.CI_PIPELINE_ID?.trim();
+    const delivered = await deliverNotificationEnvelope(notificationEnvelope, {
+      webhookUrl: notificationWebhookUrl,
+      ...process.env.DELOITTE_NOTIFICATION_WEBHOOK_TOKEN?.trim() ? { token: process.env.DELOITTE_NOTIFICATION_WEBHOOK_TOKEN.trim() } : {},
+      ...runId ? { idempotencyKey: `deloitte-postman:${workspaceId}:${runId}` } : {}
+    });
+    process.stderr.write(`info: Deloitte notification gateway accepted ${delivered} onboarding notification(s).
+`);
+  }
   process.stdout.write(`${formatSummary(summary)}
 `);
   if (summary.counts.failed > 0) return 1;

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 
 export const POSTMAN_KEY = 'qa-postman-key-never-log';
 export const SCIM_KEY = 'qa-scim-key-never-log';
+export const NOTIFICATION_TOKEN = 'qa-notification-token-never-log';
 
 function readBody(request) {
   return new Promise((resolve, reject) => {
@@ -69,10 +70,23 @@ export async function startSimulator() {
       postmanKey: request.headers['x-api-key'],
       scimKey: request.headers.authorization,
       identifierType: request.headers.identifiertype,
-      contentType: request.headers['content-type']
+      contentType: request.headers['content-type'],
+      idempotencyKey: request.headers['idempotency-key']
     };
     requests.push(entry);
     const state = stateFor(states, scenario);
+
+    if (request.method === 'POST' && scenario.startsWith('notification-') && apiPath === '/email-batches') {
+      assert.equal(entry.scimKey, `Bearer ${NOTIFICATION_TOKEN}`);
+      assert.equal(entry.contentType, 'application/json');
+      assert.equal(parsedBody?.schemaVersion, 1);
+      assert.equal(parsedBody?.kind, 'deloitte-postman-onboarding');
+      assert(Array.isArray(parsedBody?.notifications));
+      if (scenario === 'notification-rejected') {
+        return sendJson(response, 400, { error: 'mail policy rejected batch' });
+      }
+      return sendJson(response, 202, { accepted: parsedBody.notifications.length });
+    }
 
     if (request.method === 'GET' && apiPath === '/workspace-roles') {
       state.roleCatalogAttempts += 1;
@@ -214,7 +228,7 @@ export function assertSecretsMasked(result, extraText = '') {
     .split('\n')
     .filter((line) => !line.startsWith('::add-mask::'))
     .join('\n');
-  for (const secret of [POSTMAN_KEY, SCIM_KEY]) {
+  for (const secret of [POSTMAN_KEY, SCIM_KEY, NOTIFICATION_TOKEN]) {
     assert(!nonMaskStdout.includes(secret), `stdout leaked ${secret}`);
     assert(!result.stderr.includes(secret), `stderr leaked ${secret}`);
     assert(!extraText.includes(secret), `output artifact leaked ${secret}`);

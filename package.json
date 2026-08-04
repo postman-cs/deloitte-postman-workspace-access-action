@@ -1,7 +1,7 @@
 {
   "name": "@postman-cse/deloitte-workspace-access",
-  "version": "0.3.1",
-  "description": "Reconcile GitHub collaborators into Postman workspace roles and provision missing team users through SCIM.",
+  "version": "0.4.0",
+  "description": "Onboard every detected GitHub collaborator into Postman and render Deloitte usage notifications.",
   "type": "module",
   "main": "dist/index.cjs",
   "bin": {

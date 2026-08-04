@@ -55,7 +55,8 @@ export async function resolveMembersInput(
   membersJson: string | undefined,
   membersFile: string | undefined,
   roleMapJson: string | undefined,
-  scannerSearchRoot?: string
+  scannerSearchRoot?: string,
+  defaultWorkspaceRole?: string
 ): Promise<ResolvedMembersInput> {
   const inline = membersJson?.trim();
   const explicitPath = membersFile?.trim();
@@ -64,7 +65,7 @@ export async function resolveMembersInput(
   const path = explicitPath ?? (discovered ? await discoverMembersFile(scannerSearchRoot) : undefined);
   const source = inline ?? await readFile(path as string, 'utf8');
   return {
-    members: parseMembersJson(source, parseRoleMap(roleMapJson)),
+    members: parseMembersJson(source, parseRoleMap(roleMapJson), defaultWorkspaceRole),
     source: inline ? 'inline JSON' : resolve(path as string),
     discovered
   };

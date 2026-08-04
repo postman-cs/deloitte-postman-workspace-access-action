@@ -6,7 +6,7 @@ interface ScannerSchema {
   $defs: {
     member: {
       properties: Record<string, unknown>;
-      anyOf: Array<{ required: string[] }>;
+      required: string[];
     };
   };
 }
@@ -40,20 +40,7 @@ describe('Deloitte scanner JSON schema', () => {
     ]));
   });
 
-  it('allows every accepted role or permission field to satisfy the role requirement', () => {
-    const alternatives = member.anyOf.flatMap((entry) => entry.required);
-    expect(alternatives).toEqual(expect.arrayContaining([
-      'githubPermission',
-      'github_permission',
-      'permission',
-      'role',
-      'roleName',
-      'role_name',
-      'permissions',
-      'workspaceRole',
-      'workspace_role',
-      'postmanRole',
-      'postman_role'
-    ]));
+  it('requires only the corporate email needed for inclusive onboarding', () => {
+    expect(member.required).toEqual(['email']);
   });
 });

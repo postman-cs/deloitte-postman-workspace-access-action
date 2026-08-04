@@ -9,4 +9,6 @@ members_file="${1:-scanner-output.json}"
 
 npx --yes github:postman-cs/deloitte-postman-workspace-access-action \
   --workspace-id "${POSTMAN_WORKSPACE_ID}" \
-  --members-file "${members_file}"
+  --members-file "${members_file}" \
+  --postman-workspace-url "${POSTMAN_WORKSPACE_URL:-https://go.postman.co/}" \
+  --notifications-file .deloitte-postman/notifications.json

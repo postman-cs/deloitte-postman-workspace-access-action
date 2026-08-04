@@ -60,19 +60,6 @@
           "additionalProperties": { "type": "boolean" }
         }
       },
-      "anyOf": [
-        { "required": ["githubPermission"] },
-        { "required": ["github_permission"] },
-        { "required": ["permission"] },
-        { "required": ["role"] },
-        { "required": ["roleName"] },
-        { "required": ["role_name"] },
-        { "required": ["permissions"] },
-        { "required": ["workspaceRole"] },
-        { "required": ["workspace_role"] },
-        { "required": ["postmanRole"] },
-        { "required": ["postman_role"] }
-      ],
       "additionalProperties": true
     }
   }

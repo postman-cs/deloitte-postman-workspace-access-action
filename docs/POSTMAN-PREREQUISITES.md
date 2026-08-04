@@ -44,7 +44,8 @@ Official references:
 Every collaborator must have:
 
 - A valid email address that corresponds to the person's Postman identity.
-- A supported GitHub permission or explicit `workspaceRole`/`postmanRole`.
+
+A supported GitHub permission or explicit `workspaceRole`/`postmanRole` produces a stronger or deliberate mapping. When neither is present, the action assigns the inclusive `Viewer` baseline so the collaborator is not dropped.
 
 GitHub profiles frequently omit private email addresses. Deloitte's scanner must obtain an approved corporate email from its authoritative identity source rather than assuming the public GitHub profile contains one.
 
@@ -67,6 +68,18 @@ Postman's [SCIM create-user API](https://learning.postman.com/api-docs/api-refer
 - A user already belonging to another team can return `409 Conflict` when the domain is not verified.
 
 An invited user may need to accept before the workspace role can be assigned. The action reports this as `pending`; rerun after acceptance.
+
+## Notification gateway
+
+Postman does not guarantee a workspace-assignment email for every identity state. For consistent outreach, configure Deloitte's approved HTTPS mail gateway:
+
+- Store `DELOITTE_NOTIFICATION_WEBHOOK_URL` and the optional `DELOITTE_NOTIFICATION_WEBHOOK_TOKEN` in the CI secret manager.
+- Restrict recipients to approved Deloitte domains at the gateway.
+- Deduplicate using the supplied `Idempotency-Key`.
+- Retain `.deloitte-postman/notifications.json` only under Deloitte's approved policy because it contains email addresses and rendered message bodies.
+- Use gateway telemetry—not the action's acceptance count—to confirm final mailbox delivery.
+
+See `docs/deloitte-postman-notifications.md` in the installed starter kit.
 
 ## Rotation and recovery
 

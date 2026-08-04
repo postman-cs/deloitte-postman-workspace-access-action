@@ -2095,9 +2095,9 @@ var require_dispatcher_base = __commonJS({
       }
       close(callback) {
         if (callback === void 0) {
-          return new Promise((resolve3, reject) => {
+          return new Promise((resolve4, reject) => {
             this.close((err, data) => {
-              return err ? reject(err) : resolve3(data);
+              return err ? reject(err) : resolve4(data);
             });
           });
         }
@@ -2135,12 +2135,12 @@ var require_dispatcher_base = __commonJS({
           err = null;
         }
         if (callback === void 0) {
-          return new Promise((resolve3, reject) => {
+          return new Promise((resolve4, reject) => {
             this.destroy(err, (err2, data) => {
               return err2 ? (
                 /* istanbul ignore next: should never error */
                 reject(err2)
-              ) : resolve3(data);
+              ) : resolve4(data);
             });
           });
         }
@@ -2315,9 +2315,9 @@ var require_timers = __commonJS({
        * before the specified function or code is executed.
        * @param {*} arg
        */
-      constructor(callback, delay, arg) {
+      constructor(callback, delay2, arg) {
         this._onTimeout = callback;
-        this._idleTimeout = delay;
+        this._idleTimeout = delay2;
         this._timerArg = arg;
         this.refresh();
       }
@@ -2362,8 +2362,8 @@ var require_timers = __commonJS({
        * when the timer expires.
        * @returns {NodeJS.Timeout|FastTimer}
        */
-      setTimeout(callback, delay, arg) {
-        return delay <= RESOLUTION_MS ? setTimeout(callback, delay, arg) : new FastTimer(callback, delay, arg);
+      setTimeout(callback, delay2, arg) {
+        return delay2 <= RESOLUTION_MS ? setTimeout(callback, delay2, arg) : new FastTimer(callback, delay2, arg);
       },
       /**
        * The clearTimeout method cancels an instantiated Timer previously created
@@ -2389,8 +2389,8 @@ var require_timers = __commonJS({
        * when the timer expires.
        * @returns {FastTimer}
        */
-      setFastTimeout(callback, delay, arg) {
-        return new FastTimer(callback, delay, arg);
+      setFastTimeout(callback, delay2, arg) {
+        return new FastTimer(callback, delay2, arg);
       },
       /**
        * The clearTimeout method cancels an instantiated FastTimer previously
@@ -2416,8 +2416,8 @@ var require_timers = __commonJS({
        * @deprecated
        * @param {number} [delay=0] The delay in milliseconds to add to the now value.
        */
-      tick(delay = 0) {
-        fastNow += delay - RESOLUTION_MS + 1;
+      tick(delay2 = 0) {
+        fastNow += delay2 - RESOLUTION_MS + 1;
         onTick();
         onTick();
       },
@@ -4407,8 +4407,8 @@ var require_util2 = __commonJS({
     function createDeferredPromise() {
       let res;
       let rej;
-      const promise = new Promise((resolve3, reject) => {
-        res = resolve3;
+      const promise = new Promise((resolve4, reject) => {
+        res = resolve4;
         rej = reject;
       });
       return { promise, resolve: res, reject: rej };
@@ -5816,21 +5816,21 @@ var require_client_h1 = __commonJS({
         this.connection = "";
         this.maxResponseSize = client[kMaxResponseSize];
       }
-      setTimeout(delay, type) {
-        if (delay !== this.timeoutValue || type & USE_FAST_TIMER ^ this.timeoutType & USE_FAST_TIMER) {
+      setTimeout(delay2, type) {
+        if (delay2 !== this.timeoutValue || type & USE_FAST_TIMER ^ this.timeoutType & USE_FAST_TIMER) {
           if (this.timeout) {
             timers.clearTimeout(this.timeout);
             this.timeout = null;
           }
-          if (delay) {
+          if (delay2) {
             if (type & USE_FAST_TIMER) {
-              this.timeout = timers.setFastTimeout(onParserTimeout, delay, new WeakRef(this));
+              this.timeout = timers.setFastTimeout(onParserTimeout, delay2, new WeakRef(this));
             } else {
-              this.timeout = setTimeout(onParserTimeout, delay, new WeakRef(this));
+              this.timeout = setTimeout(onParserTimeout, delay2, new WeakRef(this));
               this.timeout.unref();
             }
           }
-          this.timeoutValue = delay;
+          this.timeoutValue = delay2;
         } else if (this.timeout) {
           if (this.timeout.refresh) {
             this.timeout.refresh();
@@ -6654,12 +6654,12 @@ upgrade: ${upgrade}\r
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve3, reject) => {
+      const waitForDrain = () => new Promise((resolve4, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve3;
+          callback = resolve4;
         }
       });
       socket.on("close", onDrain).on("drain", onDrain);
@@ -7296,12 +7296,12 @@ var require_client_h2 = __commonJS({
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve3, reject) => {
+      const waitForDrain = () => new Promise((resolve4, reject) => {
         assert(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve3;
+          callback = resolve4;
         }
       });
       h2stream.on("close", onDrain).on("drain", onDrain);
@@ -7779,16 +7779,16 @@ var require_client = __commonJS({
         return this[kNeedDrain] < 2;
       }
       async [kClose]() {
-        return new Promise((resolve3) => {
+        return new Promise((resolve4) => {
           if (this[kSize]) {
-            this[kClosedResolve] = resolve3;
+            this[kClosedResolve] = resolve4;
           } else {
-            resolve3(null);
+            resolve4(null);
           }
         });
       }
       async [kDestroy](err) {
-        return new Promise((resolve3) => {
+        return new Promise((resolve4) => {
           const requests = this[kQueue].splice(this[kPendingIdx]);
           for (let i = 0; i < requests.length; i++) {
             const request = requests[i];
@@ -7799,7 +7799,7 @@ var require_client = __commonJS({
               this[kClosedResolve]();
               this[kClosedResolve] = null;
             }
-            resolve3(null);
+            resolve4(null);
           };
           if (this[kHTTPContext]) {
             this[kHTTPContext].destroy(err, callback);
@@ -7850,7 +7850,7 @@ var require_client = __commonJS({
         });
       }
       try {
-        const socket = await new Promise((resolve3, reject) => {
+        const socket = await new Promise((resolve4, reject) => {
           client[kConnector]({
             host,
             hostname,
@@ -7862,7 +7862,7 @@ var require_client = __commonJS({
             if (err) {
               reject(err);
             } else {
-              resolve3(socket2);
+              resolve4(socket2);
             }
           });
         });
@@ -8198,8 +8198,8 @@ var require_pool_base = __commonJS({
         if (this[kQueue].isEmpty()) {
           await Promise.all(this[kClients].map((c) => c.close()));
         } else {
-          await new Promise((resolve3) => {
-            this[kClosedResolve] = resolve3;
+          await new Promise((resolve4) => {
+            this[kClosedResolve] = resolve4;
           });
         }
       }
@@ -9442,7 +9442,7 @@ var require_readable = __commonJS({
         if (this._readableState.closeEmitted) {
           return null;
         }
-        return await new Promise((resolve3, reject) => {
+        return await new Promise((resolve4, reject) => {
           if (this[kContentLength] > limit) {
             this.destroy(new AbortError());
           }
@@ -9455,7 +9455,7 @@ var require_readable = __commonJS({
             if (signal?.aborted) {
               reject(signal.reason ?? new AbortError());
             } else {
-              resolve3(null);
+              resolve4(null);
             }
           }).on("error", noop).on("data", function(chunk) {
             limit -= chunk.length;
@@ -9474,7 +9474,7 @@ var require_readable = __commonJS({
     }
     async function consume(stream, type) {
       assert(!stream[kConsume]);
-      return new Promise((resolve3, reject) => {
+      return new Promise((resolve4, reject) => {
         if (isUnusable(stream)) {
           const rState = stream._readableState;
           if (rState.destroyed && rState.closeEmitted === false) {
@@ -9491,7 +9491,7 @@ var require_readable = __commonJS({
             stream[kConsume] = {
               type,
               stream,
-              resolve: resolve3,
+              resolve: resolve4,
               reject,
               length: 0,
               body: []
@@ -9561,18 +9561,18 @@ var require_readable = __commonJS({
       return buffer;
     }
     function consumeEnd(consume2) {
-      const { type, body, resolve: resolve3, stream, length } = consume2;
+      const { type, body, resolve: resolve4, stream, length } = consume2;
       try {
         if (type === "text") {
-          resolve3(chunksDecode(body, length));
+          resolve4(chunksDecode(body, length));
         } else if (type === "json") {
-          resolve3(JSON.parse(chunksDecode(body, length)));
+          resolve4(JSON.parse(chunksDecode(body, length)));
         } else if (type === "arrayBuffer") {
-          resolve3(chunksConcat(body, length).buffer);
+          resolve4(chunksConcat(body, length).buffer);
         } else if (type === "blob") {
-          resolve3(new Blob(body, { type: stream[kContentType] }));
+          resolve4(new Blob(body, { type: stream[kContentType] }));
         } else if (type === "bytes") {
-          resolve3(chunksConcat(body, length));
+          resolve4(chunksConcat(body, length));
         }
         consumeFinish(consume2);
       } catch (err) {
@@ -9829,9 +9829,9 @@ var require_api_request = __commonJS({
     };
     function request(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve3, reject) => {
+        return new Promise((resolve4, reject) => {
           request.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve3(data);
+            return err ? reject(err) : resolve4(data);
           });
         });
       }
@@ -10054,9 +10054,9 @@ var require_api_stream = __commonJS({
     };
     function stream(opts, factory, callback) {
       if (callback === void 0) {
-        return new Promise((resolve3, reject) => {
+        return new Promise((resolve4, reject) => {
           stream.call(this, opts, factory, (err, data) => {
-            return err ? reject(err) : resolve3(data);
+            return err ? reject(err) : resolve4(data);
           });
         });
       }
@@ -10341,9 +10341,9 @@ var require_api_upgrade = __commonJS({
     };
     function upgrade(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve3, reject) => {
+        return new Promise((resolve4, reject) => {
           upgrade.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve3(data);
+            return err ? reject(err) : resolve4(data);
           });
         });
       }
@@ -10435,9 +10435,9 @@ var require_api_connect = __commonJS({
     };
     function connect(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve3, reject) => {
+        return new Promise((resolve4, reject) => {
           connect.call(this, opts, (err, data) => {
-            return err ? reject(err) : resolve3(data);
+            return err ? reject(err) : resolve4(data);
           });
         });
       }
@@ -10718,7 +10718,7 @@ var require_mock_utils = __commonJS({
       if (mockDispatch2.data.callback) {
         mockDispatch2.data = { ...mockDispatch2.data, ...mockDispatch2.data.callback(opts) };
       }
-      const { data: { statusCode, data, headers, trailers, error: error2 }, delay, persist } = mockDispatch2;
+      const { data: { statusCode, data, headers, trailers, error: error2 }, delay: delay2, persist } = mockDispatch2;
       const { timesInvoked, times } = mockDispatch2;
       mockDispatch2.consumed = !persist && timesInvoked >= times;
       mockDispatch2.pending = timesInvoked < times;
@@ -10727,10 +10727,10 @@ var require_mock_utils = __commonJS({
         handler.onError(error2);
         return true;
       }
-      if (typeof delay === "number" && delay > 0) {
+      if (typeof delay2 === "number" && delay2 > 0) {
         setTimeout(() => {
           handleReply(this[kDispatches]);
-        }, delay);
+        }, delay2);
       } else {
         handleReply(this[kDispatches]);
       }
@@ -14299,7 +14299,7 @@ var require_fetch = __commonJS({
       function dispatch({ body }) {
         const url = requestCurrentURL(request);
         const agent = fetchParams.controller.dispatcher;
-        return new Promise((resolve3, reject) => agent.dispatch(
+        return new Promise((resolve4, reject) => agent.dispatch(
           {
             path: url.pathname + url.search,
             origin: url.origin,
@@ -14375,7 +14375,7 @@ var require_fetch = __commonJS({
                 }
               }
               const onError = this.onError.bind(this);
-              resolve3({
+              resolve4({
                 status,
                 statusText,
                 headersList,
@@ -14421,7 +14421,7 @@ var require_fetch = __commonJS({
               for (let i = 0; i < rawHeaders.length; i += 2) {
                 headersList.append(bufferToLowerCasedHeaderName(rawHeaders[i]), rawHeaders[i + 1].toString("latin1"), true);
               }
-              resolve3({
+              resolve4({
                 status,
                 statusText: STATUS_CODES[status],
                 headersList,
@@ -18150,15 +18150,15 @@ var require_util8 = __commonJS({
       }
       return true;
     }
-    function delay(ms) {
-      return new Promise((resolve3) => {
-        setTimeout(resolve3, ms).unref();
+    function delay2(ms) {
+      return new Promise((resolve4) => {
+        setTimeout(resolve4, ms).unref();
       });
     }
     module2.exports = {
       isValidLastEventId,
       isASCIINumber,
-      delay
+      delay: delay2
     };
   }
 });
@@ -18405,7 +18405,7 @@ var require_eventsource = __commonJS({
     var { parseMIMEType } = require_data_url();
     var { createFastMessageEvent } = require_events();
     var { isNetworkError } = require_response();
-    var { delay } = require_util8();
+    var { delay: delay2 } = require_util8();
     var { kEnumerableProperty } = require_util();
     var { environmentSettingsObject } = require_util2();
     var experimentalWarned = false;
@@ -18576,7 +18576,7 @@ var require_eventsource = __commonJS({
         if (this.#readyState === CLOSED) return;
         this.#readyState = CONNECTING;
         this.dispatchEvent(new Event("error"));
-        await delay(this.#state.reconnectionTime);
+        await delay2(this.#state.reconnectionTime);
         if (this.#readyState !== CONNECTING) return;
         if (this.#state.lastEventId.length) {
           this.#request.headersList.set("last-event-id", this.#state.lastEventId, true);
@@ -19001,11 +19001,11 @@ var import_os = require("os");
 var import_fs = require("fs");
 var __awaiter = function(thisArg, _arguments, P, generator) {
   function adopt(value) {
-    return value instanceof P ? value : new P(function(resolve3) {
-      resolve3(value);
+    return value instanceof P ? value : new P(function(resolve4) {
+      resolve4(value);
     });
   }
-  return new (P || (P = Promise))(function(resolve3, reject) {
+  return new (P || (P = Promise))(function(resolve4, reject) {
     function fulfilled(value) {
       try {
         step(generator.next(value));
@@ -19021,7 +19021,7 @@ var __awaiter = function(thisArg, _arguments, P, generator) {
       }
     }
     function step(result) {
-      result.done ? resolve3(result.value) : adopt(result.value).then(fulfilled, rejected);
+      result.done ? resolve4(result.value) : adopt(result.value).then(fulfilled, rejected);
     }
     step((generator = generator.apply(thisArg, _arguments || [])).next());
   });
@@ -19339,8 +19339,8 @@ function info(message) {
 }
 
 // src/index.ts
-var import_promises2 = require("node:fs/promises");
-var import_node_path2 = require("node:path");
+var import_promises3 = require("node:fs/promises");
+var import_node_path3 = require("node:path");
 
 // src/contracts.ts
 var DEFAULT_ROLE_MAP = {
@@ -19446,7 +19446,7 @@ function unwrapMembers(value) {
   }
   throw new Error("Members input must be an array or an object with a members/collaborators array.");
 }
-function parseMembersJson(value, roleMap) {
+function parseMembersJson(value, roleMap, defaultWorkspaceRole) {
   let parsed;
   try {
     parsed = JSON.parse(value);
@@ -19471,7 +19471,8 @@ function parseMembersJson(value, roleMap) {
     );
     const candidates = permissionCandidates(member);
     const permission = candidates.find((candidate) => roleMap[candidate]);
-    const workspaceRole = explicitRole ?? (permission ? roleMap[permission] : void 0);
+    const fallbackRole = optionalString(defaultWorkspaceRole);
+    const workspaceRole = explicitRole ?? (permission ? roleMap[permission] : void 0) ?? fallbackRole;
     if (!workspaceRole) {
       throw new Error(
         `Member ${email} has no Postman workspace role and its GitHub permission is not present in role-map-json.`
@@ -19487,7 +19488,7 @@ function parseMembersJson(value, roleMap) {
       email,
       workspaceRole,
       ...githubLogin ? { githubLogin } : {},
-      ...permission ? { githubPermission: permission } : {},
+      ...permission ?? candidates[0] ? { githubPermission: permission ?? candidates[0] } : {},
       ...scimId ? { scimId } : {},
       ...externalId ? { externalId } : {},
       ...givenName ? { givenName } : {},
@@ -19520,6 +19521,220 @@ function parseBoolean(value, fallback = false) {
   throw new Error(`Expected true or false, received ${value}.`);
 }
 
+// src/notifications.ts
+var import_promises = require("node:fs/promises");
+var import_node_path = require("node:path");
+var DEFAULT_NOTIFICATION_SUBJECT = "Deloitte: Your Postman workspace access";
+var DEFAULT_POSTMAN_WORKSPACE_URL = "https://go.postman.co/";
+var RETRYABLE_STATUSES = /* @__PURE__ */ new Set([429, 500, 502, 503, 504]);
+function normalizeWorkspaceUrl(value) {
+  const candidate = value?.trim() || DEFAULT_POSTMAN_WORKSPACE_URL;
+  let url;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new Error("postman-workspace-url must be a valid HTTPS URL.");
+  }
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error("postman-workspace-url must be a credential-free HTTPS URL.");
+  }
+  return url.toString();
+}
+function normalizeSubject(value) {
+  const subject = (value?.trim() || DEFAULT_NOTIFICATION_SUBJECT).replaceAll(/[\r\n]+/g, " ").trim();
+  if (subject.length > 200) throw new Error("notification-subject must be 200 characters or fewer.");
+  return subject;
+}
+function escapeHtml(value) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+function notificationStatus(result) {
+  if (result.workspaceAccess === "pending") return "invitation-pending";
+  if (result.workspaceAccess === "would-add") return "preview";
+  if (result.workspaceAccess === "failed" || result.lifecycle === "failed") return "needs-attention";
+  return "ready";
+}
+function statusCopy(result) {
+  if (result.workspaceAccess === "pending") {
+    return {
+      headline: "Your Postman team invitation has been submitted.",
+      nextStep: "Accept the Postman invitation in your inbox. The pipeline can add your workspace access on its next run."
+    };
+  }
+  if (result.workspaceAccess === "would-add") {
+    return {
+      headline: "Your Postman onboarding is included in the current preview.",
+      nextStep: "No email is sent from a preview. The pipeline will provision access when the approved apply run starts."
+    };
+  }
+  if (result.workspaceAccess === "failed" || result.lifecycle === "failed") {
+    return {
+      headline: "Deloitte identified that you need Postman access, but this run could not finish it.",
+      nextStep: "The pipeline owner has the failure details and can safely retry your onboarding."
+    };
+  }
+  if (result.lifecycle === "provisioned") {
+    return {
+      headline: "Your Postman team membership and workspace access are ready.",
+      nextStep: "Sign in with your Deloitte email address, use Deloitte SSO if prompted, and open the workspace."
+    };
+  }
+  if (result.lifecycle === "reactivated") {
+    return {
+      headline: "Your Postman account was reactivated and your workspace access is ready.",
+      nextStep: "Sign in with your Deloitte email address and open the workspace."
+    };
+  }
+  return {
+    headline: "Your Postman workspace access is ready.",
+    nextStep: "Sign in with your Deloitte email address and open the workspace."
+  };
+}
+function repositoryCopy(sourceRepository) {
+  return sourceRepository ? `You were included in Postman onboarding because you were detected as a contributor to ${sourceRepository}.` : "You were included in Postman onboarding because you were detected as a contributor to a Deloitte GitHub repository.";
+}
+function renderText(result, workspaceUrl, sourceRepository) {
+  const copy = statusCopy(result);
+  return [
+    "Hello,",
+    "",
+    repositoryCopy(sourceRepository),
+    copy.headline,
+    "",
+    `Postman workspace role: ${result.workspaceRole}`,
+    `Next step: ${copy.nextStep}`,
+    `Open Postman: ${workspaceUrl}`,
+    "",
+    "Three useful ways to get started:",
+    "- Find and reuse the APIs, collections, and environments your repository depends on.",
+    "- Run collections locally or in CI to validate API behavior before merging.",
+    "- Collaborate in the workspace so API changes, examples, and tests stay discoverable.",
+    "",
+    "\u2014 Deloitte API Enablement"
+  ].join("\n");
+}
+function renderHtml(result, workspaceUrl, sourceRepository) {
+  const copy = statusCopy(result);
+  const safeUrl = escapeHtml(workspaceUrl);
+  return [
+    "<!doctype html>",
+    '<html><body style="margin:0;background:#f7f7f7;font-family:Arial,sans-serif;color:#212121">',
+    '<div style="max-width:640px;margin:24px auto;background:#ffffff;border:1px solid #e6e6e6;border-radius:12px;overflow:hidden">',
+    '<div style="height:8px;background:#ff6c37"></div>',
+    '<div style="padding:32px">',
+    '<p style="margin-top:0">Hello,</p>',
+    `<p>${escapeHtml(repositoryCopy(sourceRepository))}</p>`,
+    `<h2 style="color:#ff6c37">${escapeHtml(copy.headline)}</h2>`,
+    `<p><strong>Postman workspace role:</strong> ${escapeHtml(result.workspaceRole)}</p>`,
+    `<p><strong>Next step:</strong> ${escapeHtml(copy.nextStep)}</p>`,
+    `<p style="margin:28px 0"><a href="${safeUrl}" style="background:#ff6c37;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold">Open Postman</a></p>`,
+    "<h3>Get value from the workspace</h3>",
+    "<ul>",
+    "<li>Find and reuse the APIs, collections, and environments your repository depends on.</li>",
+    "<li>Run collections locally or in CI before merging API changes.</li>",
+    "<li>Keep API examples, tests, and collaboration discoverable for the whole team.</li>",
+    "</ul>",
+    '<p style="margin-bottom:0">\u2014 Deloitte API Enablement</p>',
+    "</div></div></body></html>"
+  ].join("");
+}
+function notificationFor(result, summary2, options) {
+  return {
+    to: result.email,
+    subject: options.subject,
+    text: renderText(result, options.workspaceUrl, options.sourceRepository),
+    html: renderHtml(result, options.workspaceUrl, options.sourceRepository),
+    workspaceRole: result.workspaceRole,
+    lifecycle: result.lifecycle,
+    workspaceAccess: result.workspaceAccess,
+    status: notificationStatus(result),
+    send: !summary2.dryRun && result.workspaceAccess !== "would-add"
+  };
+}
+function buildNotificationEnvelope(summary2, options = {}) {
+  const workspaceUrl = normalizeWorkspaceUrl(options.workspaceUrl);
+  const subject = normalizeSubject(options.subject);
+  const sourceRepository = options.sourceRepository?.trim() || void 0;
+  return {
+    schemaVersion: 1,
+    kind: "deloitte-postman-onboarding",
+    workspace: { id: summary2.workspaceId, url: workspaceUrl },
+    ...sourceRepository ? { sourceRepository } : {},
+    notifications: summary2.results.map((result) => notificationFor(result, summary2, {
+      workspaceUrl,
+      subject,
+      ...sourceRepository ? { sourceRepository } : {}
+    }))
+  };
+}
+async function writeNotificationEnvelope(path, envelope) {
+  const outputPath = (0, import_node_path.resolve)(path);
+  await (0, import_promises.mkdir)((0, import_node_path.dirname)(outputPath), { recursive: true });
+  await (0, import_promises.writeFile)(outputPath, `${JSON.stringify(envelope, null, 2)}
+`, { mode: 384 });
+  return outputPath;
+}
+function notificationEndpoint(value) {
+  let endpoint;
+  try {
+    endpoint = new URL(value);
+  } catch {
+    throw new Error("The notification webhook must be a valid HTTPS URL.");
+  }
+  const local = endpoint.hostname === "127.0.0.1" || endpoint.hostname === "localhost" || endpoint.hostname === "::1";
+  if (endpoint.protocol !== "https:" && !(local && endpoint.protocol === "http:")) {
+    throw new Error("The notification webhook must use HTTPS (HTTP is allowed only for localhost tests).");
+  }
+  if (endpoint.username || endpoint.password) {
+    throw new Error("The notification webhook URL must not contain credentials.");
+  }
+  return endpoint;
+}
+function validateNotificationConfiguration(options, webhookUrl) {
+  normalizeWorkspaceUrl(options.workspaceUrl);
+  normalizeSubject(options.subject);
+  if (webhookUrl?.trim()) notificationEndpoint(webhookUrl);
+}
+function retryDelay(response, attempt) {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter && /^\d+$/.test(retryAfter)) return Math.min(Number(retryAfter) * 1e3, 5e3);
+  return attempt * 250;
+}
+async function delay(milliseconds) {
+  await new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+}
+async function deliverNotificationEnvelope(envelope, options) {
+  const notifications = envelope.notifications.filter((notification) => notification.send);
+  if (notifications.length === 0) return 0;
+  const endpoint = notificationEndpoint(options.webhookUrl);
+  const token = options.token?.trim();
+  const idempotencyKey = options.idempotencyKey?.trim();
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const payload = { ...envelope, notifications };
+  const maxAttempts = idempotencyKey ? 3 : 1;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "user-agent": "deloitte-postman-workspace-access-action",
+        ...token ? { authorization: `Bearer ${token}` } : {},
+        ...idempotencyKey ? { "idempotency-key": idempotencyKey } : {}
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15e3)
+    });
+    if (response.ok) return notifications.length;
+    if (attempt < maxAttempts && RETRYABLE_STATUSES.has(response.status)) {
+      await delay(retryDelay(response, attempt));
+      continue;
+    }
+    throw new Error(`Notification gateway returned HTTP ${response.status}.`);
+  }
+  throw new Error("Notification gateway delivery failed.");
+}
+
 // src/postman-client.ts
 var RETRYABLE_STATUS = /* @__PURE__ */ new Set([429, 500, 502, 503, 504]);
 var SCIM_USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
@@ -19535,7 +19750,7 @@ function asRecord(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 function sleep(milliseconds) {
-  return new Promise((resolve3) => setTimeout(resolve3, milliseconds));
+  return new Promise((resolve4) => setTimeout(resolve4, milliseconds));
 }
 function responseDelay(response, attempt) {
   const retryAfter = response.headers.get("retry-after");
@@ -19861,8 +20076,8 @@ async function reconcileWorkspaceAccess(client, options, reporter) {
 }
 
 // src/runtime.ts
-var import_promises = require("node:fs/promises");
-var import_node_path = require("node:path");
+var import_promises2 = require("node:fs/promises");
+var import_node_path2 = require("node:path");
 var SCANNER_FILENAMES = /* @__PURE__ */ new Set([
   "deloitte-github-scanner-output.json",
   "github-scanner-output.json",
@@ -19870,9 +20085,9 @@ var SCANNER_FILENAMES = /* @__PURE__ */ new Set([
 ]);
 var SKIPPED_DIRECTORIES = /* @__PURE__ */ new Set([".git", "node_modules"]);
 async function findScannerFiles(directory, results) {
-  const entries = await (0, import_promises.readdir)(directory, { withFileTypes: true });
+  const entries = await (0, import_promises2.readdir)(directory, { withFileTypes: true });
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
-    const path = (0, import_node_path.join)(directory, entry.name);
+    const path = (0, import_node_path2.join)(directory, entry.name);
     if (entry.isDirectory() && !SKIPPED_DIRECTORIES.has(entry.name)) {
       await findScannerFiles(path, results);
     } else if (entry.isFile() && SCANNER_FILENAMES.has(entry.name.toLowerCase())) {
@@ -19881,7 +20096,7 @@ async function findScannerFiles(directory, results) {
   }
 }
 async function discoverMembersFile(searchRoot = process.cwd()) {
-  const root = (0, import_node_path.resolve)(searchRoot);
+  const root = (0, import_node_path2.resolve)(searchRoot);
   const matches = [];
   try {
     await findScannerFiles(root, matches);
@@ -19896,21 +20111,21 @@ async function discoverMembersFile(searchRoot = process.cwd()) {
     );
   }
   if (matches.length > 1) {
-    const candidates = matches.map((path) => (0, import_node_path.relative)(root, path) || path).join(", ");
+    const candidates = matches.map((path) => (0, import_node_path2.relative)(root, path) || path).join(", ");
     throw new Error(`Multiple scanner outputs were found under ${root}: ${candidates}. Set members-file explicitly.`);
   }
   return matches[0];
 }
-async function resolveMembersInput(membersJson, membersFile, roleMapJson, scannerSearchRoot) {
+async function resolveMembersInput(membersJson, membersFile, roleMapJson, scannerSearchRoot, defaultWorkspaceRole) {
   const inline = membersJson?.trim();
   const explicitPath = membersFile?.trim();
   if (inline && explicitPath) throw new Error("Provide only one of members-json or members-file.");
   const discovered = !inline && !explicitPath;
   const path = explicitPath ?? (discovered ? await discoverMembersFile(scannerSearchRoot) : void 0);
-  const source = inline ?? await (0, import_promises.readFile)(path, "utf8");
+  const source = inline ?? await (0, import_promises2.readFile)(path, "utf8");
   return {
-    members: parseMembersJson(source, parseRoleMap(roleMapJson)),
-    source: inline ? "inline JSON" : (0, import_node_path.resolve)(path),
+    members: parseMembersJson(source, parseRoleMap(roleMapJson), defaultWorkspaceRole),
+    source: inline ? "inline JSON" : (0, import_node_path2.resolve)(path),
     discovered
   };
 }
@@ -19970,13 +20185,24 @@ async function runAction() {
     const workspaceId = getInput("workspace-id", { required: true }).trim();
     const postmanApiKey = getInput("postman-api-key", { required: true }).trim();
     const scimApiKey = optionalInput("postman-scim-api-key");
+    const notificationWebhookUrl = optionalInput("notification-webhook-url");
+    const notificationWebhookToken = optionalInput("notification-webhook-token");
+    const workspaceUrl = optionalInput("postman-workspace-url");
+    const notificationSubject = optionalInput("notification-subject");
     setSecret(postmanApiKey);
     if (scimApiKey) setSecret(scimApiKey);
+    if (notificationWebhookUrl) setSecret(notificationWebhookUrl);
+    if (notificationWebhookToken) setSecret(notificationWebhookToken);
+    validateNotificationConfiguration({
+      ...workspaceUrl ? { workspaceUrl } : {},
+      ...notificationSubject ? { subject: notificationSubject } : {}
+    }, notificationWebhookUrl);
     const resolved = await resolveMembersInput(
       optionalInput("members-json"),
       optionalInput("members-file"),
       optionalInput("role-map-json"),
-      optionalInput("scanner-search-root")
+      optionalInput("scanner-search-root"),
+      optionalInput("default-workspace-role") ?? "Viewer"
     );
     if (resolved.discovered) info(`Auto-discovered scanner output at ${resolved.source}.`);
     const dryRun = parseBoolean(optionalInput("dry-run"));
@@ -20004,13 +20230,42 @@ async function runAction() {
     setOutput("scanner-source", resolved.source);
     const summaryFile = optionalInput("summary-file");
     if (summaryFile) {
-      const summaryPath = (0, import_node_path2.resolve)(summaryFile);
-      await (0, import_promises2.mkdir)((0, import_node_path2.dirname)(summaryPath), { recursive: true });
-      await (0, import_promises2.writeFile)(summaryPath, `${formatSummary(summary2)}
+      const summaryPath = (0, import_node_path3.resolve)(summaryFile);
+      await (0, import_promises3.mkdir)((0, import_node_path3.dirname)(summaryPath), { recursive: true });
+      await (0, import_promises3.writeFile)(summaryPath, `${formatSummary(summary2)}
 `, { mode: 384 });
       setOutput("summary-file", summaryPath);
     }
     await summary.addRaw(formatMarkdownSummary(summary2)).write();
+    const sourceRepository = optionalInput("source-repository") ?? process.env.GITHUB_REPOSITORY;
+    const notificationEnvelope = buildNotificationEnvelope(summary2, {
+      ...workspaceUrl ? { workspaceUrl } : {},
+      ...sourceRepository ? { sourceRepository } : {},
+      ...notificationSubject ? { subject: notificationSubject } : {}
+    });
+    const notificationCount = notificationEnvelope.notifications.length;
+    const eligibleNotificationCount = notificationEnvelope.notifications.filter(({ send }) => send).length;
+    setOutput("notification-count", String(notificationCount));
+    setOutput("notification-eligible-count", String(eligibleNotificationCount));
+    setOutput("notification-delivered-count", "0");
+    const notificationsFile = optionalInput("notifications-file");
+    if (notificationsFile) {
+      const notificationsPath = await writeNotificationEnvelope(notificationsFile, notificationEnvelope);
+      setOutput("notifications-file", notificationsPath);
+    }
+    if (notificationWebhookUrl) {
+      const runId = process.env.GITHUB_RUN_ID?.trim();
+      const runAttempt = process.env.GITHUB_RUN_ATTEMPT?.trim() || "1";
+      const delivered = await deliverNotificationEnvelope(notificationEnvelope, {
+        webhookUrl: notificationWebhookUrl,
+        ...notificationWebhookToken ? { token: notificationWebhookToken } : {},
+        ...runId ? { idempotencyKey: `deloitte-postman:${workspaceId}:${runId}:${runAttempt}` } : {}
+      });
+      setOutput("notification-delivered-count", String(delivered));
+      info(`Deloitte notification gateway accepted ${delivered} onboarding notification(s).`);
+    } else if (!dryRun && notificationCount > 0) {
+      info("Onboarding notifications were generated but not delivered because notification-webhook-url is not configured.");
+    }
     if (summary2.counts.failed > 0) {
       throw new Error(`${summary2.counts.failed} workspace access operation(s) failed.`);
     }
