@@ -36,6 +36,12 @@ jobs:
           mkdir -p .deloitte-postman/scanner
           gh run download "${run_id}" --name "${artifact}" --dir .deloitte-postman/scanner
 
+      - name: Mint Postman service-account token
+        id: postman_token
+        uses: postman-cs/postman-resolve-service-token-action@71bb640cde9e070238b90ab80801c91ce73e0564 # v2.1.1
+        with:
+          postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+
       - name: Complete accepted invitations
         uses: ./.github/actions/deloitte-postman-workspace-access
         with:
@@ -43,6 +49,7 @@ jobs:
           scanner-search-root: .deloitte-postman/scanner
           config-file: .deloitte-postman.yml
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+          postman-access-token: ${{ steps.postman_token.outputs.token }}
           postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
           fail-on-pending-invites: 'false'
           summary-file: .deloitte-postman/pending-summary.json

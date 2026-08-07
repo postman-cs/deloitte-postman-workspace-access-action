@@ -54,6 +54,7 @@ export async function runAction(): Promise<void> {
   try {
     const workspaceId = core.getInput('workspace-id', { required: true }).trim();
     const postmanApiKey = core.getInput('postman-api-key', { required: true }).trim();
+    const postmanAccessToken = optionalInput('postman-access-token');
     const scimApiKey = optionalInput('postman-scim-api-key');
     const notificationWebhookUrl = optionalInput('notification-webhook-url');
     const notificationWebhookToken = optionalInput('notification-webhook-token');
@@ -63,6 +64,7 @@ export async function runAction(): Promise<void> {
     const workspaceUrl = optionalInput('postman-workspace-url') ?? config.postmanWorkspaceUrl;
     const notificationSubject = optionalInput('notification-subject') ?? config.notification?.subject;
     core.setSecret(postmanApiKey);
+    if (postmanAccessToken) core.setSecret(postmanAccessToken);
     if (scimApiKey) core.setSecret(scimApiKey);
     if (notificationWebhookUrl) core.setSecret(notificationWebhookUrl);
     if (notificationWebhookToken) core.setSecret(notificationWebhookToken);
@@ -111,6 +113,7 @@ export async function runAction(): Promise<void> {
     const baseUrl = optionalInput('postman-base-url');
     const client = new PostmanClient({
       postmanApiKey,
+      ...(postmanAccessToken ? { postmanAccessToken } : {}),
       ...(scimApiKey ? { scimApiKey } : {}),
       ...(baseUrl ? { baseUrl } : {})
     });

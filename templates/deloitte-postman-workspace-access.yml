@@ -119,6 +119,12 @@ jobs:
           name: ${{ inputs['scanner-artifact'] }}
           path: .deloitte-postman/scanner
 
+      - name: Mint Postman service-account token
+        id: postman_token
+        uses: postman-cs/postman-resolve-service-token-action@71bb640cde9e070238b90ab80801c91ce73e0564 # v2.1.1
+        with:
+          postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+
       - name: Reconcile Deloitte workspace access
         id: access
         uses: ./.github/actions/deloitte-postman-workspace-access
@@ -128,6 +134,7 @@ jobs:
           scanner-search-root: ${{ inputs['scanner-artifact'] != '' && '.deloitte-postman/scanner' || inputs['scanner-search-root'] }}
           identity-map-file: ${{ inputs['identity-map-file'] }}
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+          postman-access-token: ${{ steps.postman_token.outputs.token }}
           postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
           default-workspace-role: ${{ inputs['default-workspace-role'] }}
           postman-workspace-url: ${{ inputs['postman-workspace-url'] }}

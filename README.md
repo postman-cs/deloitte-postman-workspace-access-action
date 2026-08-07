@@ -17,14 +17,14 @@ For a customer handoff, start with [QUICKSTART.md](QUICKSTART.md). Sharooq's one
 ## Sharooq's golden path
 
 ```bash
-git clone --branch v0.5.0 --depth 1 \
+git clone --branch v0.6.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 ./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
   /path/to/deloitte-pipeline
 ```
 
-Then set `POSTMAN_API_KEY` and `POSTMAN_SCIM_API_KEY` as GitHub Actions secrets. To send an explicit email to every detected collaborator, also set `DELOITTE_NOTIFICATION_WEBHOOK_URL` and, when required by the gateway, `DELOITTE_NOTIFICATION_WEBHOOK_TOKEN`. Run the installed read-only preflight:
+Then set the system service account's long-lived `POSTMAN_API_KEY` and the separate `POSTMAN_SCIM_API_KEY` as GitHub Actions secrets. The installed workflows mint a fresh short-lived access token for every run; don't store that token as a long-lived secret. To send an explicit email to every detected collaborator, also set `DELOITTE_NOTIFICATION_WEBHOOK_URL` and, when required by the gateway, `DELOITTE_NOTIFICATION_WEBHOOK_TOKEN`. Run the installed read-only preflight with a freshly minted `POSTMAN_ACCESS_TOKEN` in the environment:
 
 ```bash
 cd /path/to/deloitte-pipeline
@@ -49,6 +49,12 @@ Edit `.deloitte-postman.yml` once to set the scanner location, identity map, exc
 ## Fastest integration
 
 ```yaml
+- name: Mint Postman service-account token
+  id: postman_token
+  uses: postman-cs/postman-resolve-service-token-action@71bb640cde9e070238b90ab80801c91ce73e0564 # v2.1.1
+  with:
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+
 - name: Onboard API into Postman
   id: onboard
   uses: postman-cs/postman-api-onboarding-action@v3
@@ -56,15 +62,16 @@ Edit `.deloitte-postman.yml` once to set the scanner location, identity map, exc
     project-name: ${{ github.event.repository.name }}
     spec-path: openapi.yaml
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
-    postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
+    postman-access-token: ${{ steps.postman_token.outputs.token }}
 
 - name: Reconcile workspace access
   id: access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.5.0
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.6.0
   with:
     workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-json: ${{ steps['github-scanner'].outputs['members-json'] }}
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+    postman-access-token: ${{ steps.postman_token.outputs.token }}
     postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
     postman-workspace-url: ${{ steps.onboard.outputs['workspace-url'] }}
     notification-webhook-url: ${{ secrets.DELOITTE_NOTIFICATION_WEBHOOK_URL }}
@@ -175,6 +182,7 @@ The bundle also exposes a CI-neutral executable:
 
 ```bash
 export POSTMAN_API_KEY="${POSTMAN_API_KEY}"
+export POSTMAN_ACCESS_TOKEN="${POSTMAN_ACCESS_TOKEN}"
 export POSTMAN_SCIM_API_KEY="${POSTMAN_SCIM_API_KEY}"
 export DELOITTE_NOTIFICATION_WEBHOOK_URL="${DELOITTE_NOTIFICATION_WEBHOOK_URL}"
 export DELOITTE_NOTIFICATION_WEBHOOK_TOKEN="${DELOITTE_NOTIFICATION_WEBHOOK_TOKEN}"
@@ -195,6 +203,7 @@ with:
   workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
   members-file: scanner-output.json
   postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+  postman-access-token: ${{ steps.postman_token.outputs.token }}
   postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
   dry-run: 'true'
 ```
@@ -259,6 +268,7 @@ This allows an internal maintainer to download and securely transfer the starter
 ## Credentials and permissions
 
 - `POSTMAN_API_KEY` / `postman-api-key`: must be allowed to view available workspace roles and manage the target workspace.
+- `POSTMAN_ACCESS_TOKEN` / `postman-access-token`: freshly minted, short-lived system service-account token used with the PMAK for Postman API calls. The installed GitHub workflows mint it automatically.
 - `POSTMAN_SCIM_API_KEY` / `postman-scim-api-key`: required only when the scanner doesn't supply SCIM IDs and the action must look up or provision users.
 - `DELOITTE_NOTIFICATION_WEBHOOK_URL` / `notification-webhook-url`: optional approved HTTPS mail-gateway endpoint.
 - `DELOITTE_NOTIFICATION_WEBHOOK_TOKEN` / `notification-webhook-token`: optional bearer credential for that endpoint.

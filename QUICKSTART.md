@@ -10,7 +10,7 @@ This action expects two things from the existing onboarding flow:
 Clone the immutable release and install the complete starter kit into Deloitte's pipeline repository:
 
 ```bash
-git clone --branch v0.5.0 --depth 1 \
+git clone --branch v0.6.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 ./deloitte-postman-workspace-access-action/scripts/deloitte-init.sh \
@@ -39,7 +39,7 @@ It refuses to overwrite an existing installation. Use `--upgrade` only when inte
 
 Store these in the CI platform's secret manager:
 
-- `POSTMAN_API_KEY` — manages roles on the onboarded workspace.
+- `POSTMAN_API_KEY` — long-lived system service-account PMAK used to mint a short-lived token.
 - `POSTMAN_SCIM_API_KEY` — looks up current users and provisions or invites missing users.
 - `DELOITTE_NOTIFICATION_WEBHOOK_URL` — optional approved endpoint that sends the rendered email batch.
 - `DELOITTE_NOTIFICATION_WEBHOOK_TOKEN` — optional bearer token for that endpoint.
@@ -80,13 +80,20 @@ Name an artifact file `deloitte-github-scanner-output.json`, `github-scanner-out
 Use this when the consumer repository is allowed to run private actions from `postman-cs`:
 
 ```yaml
+- name: Mint Postman service-account token
+  id: postman_token
+  uses: postman-cs/postman-resolve-service-token-action@71bb640cde9e070238b90ab80801c91ce73e0564 # v2.1.1
+  with:
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+
 - name: Reconcile Deloitte workspace access
   id: deloitte-access
-  uses: postman-cs/deloitte-postman-workspace-access-action@v0.5.0
+  uses: postman-cs/deloitte-postman-workspace-access-action@v0.6.0
   with:
     workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-json: ${{ steps['github-scanner'].outputs['members-json'] }}
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+    postman-access-token: ${{ steps.postman_token.outputs.token }}
     postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
     postman-workspace-url: ${{ steps.onboard.outputs['workspace-url'] }}
     notification-webhook-url: ${{ secrets.DELOITTE_NOTIFICATION_WEBHOOK_URL }}
@@ -98,7 +105,7 @@ Use this when the consumer repository is allowed to run private actions from `po
 Use this when Deloitte wants the runnable bundle in the same repository as its pipeline:
 
 ```bash
-git clone --branch v0.5.0 --depth 1 \
+git clone --branch v0.6.0 --depth 1 \
   https://github.com/postman-cs/deloitte-postman-workspace-access-action.git
 
 cd deloitte-postman-workspace-access-action
@@ -121,12 +128,18 @@ The consuming workflow then uses the local path:
 
 ```yaml
 - uses: actions/checkout@v7
+- name: Mint Postman service-account token
+  id: postman_token
+  uses: postman-cs/postman-resolve-service-token-action@71bb640cde9e070238b90ab80801c91ce73e0564 # v2.1.1
+  with:
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
 - name: Reconcile Deloitte workspace access
   uses: ./.github/actions/deloitte-postman-workspace-access
   with:
     workspace-id: ${{ steps.onboard.outputs['workspace-id'] }}
     members-file: scanner-output.json
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+    postman-access-token: ${{ steps.postman_token.outputs.token }}
     postman-scim-api-key: ${{ secrets.POSTMAN_SCIM_API_KEY }}
 ```
 
@@ -134,6 +147,7 @@ The consuming workflow then uses the local path:
 
 ```bash
 export POSTMAN_API_KEY
+export POSTMAN_ACCESS_TOKEN
 export POSTMAN_SCIM_API_KEY
 
 ./dist/cli.cjs \

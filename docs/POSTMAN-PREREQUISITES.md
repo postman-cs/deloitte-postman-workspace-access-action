@@ -16,20 +16,22 @@ Official references:
 
 ## Required credentials
 
-Create and store two independent credentials:
+Create and store two independent long-lived credentials. System service-account runs also mint an ephemeral access token:
 
-| GitHub secret | Purpose | Minimum validation |
+| Credential | Purpose | Minimum validation |
 | --- | --- | --- |
-| `POSTMAN_API_KEY` | Reads the workspace and available roles, then assigns workspace roles. | `doctor` can read the target workspace and `GET /workspace-roles`. |
+| `POSTMAN_API_KEY` | Long-lived system service-account PMAK used to mint an access token. | The token resolver can mint a token and resolve the intended team. |
+| `POSTMAN_ACCESS_TOKEN` | Ephemeral service-account token used with the PMAK for Postman API reads and workspace-role writes. Do not store it long term. | `doctor` can read the target workspace and `GET /workspace-roles`. |
 | `POSTMAN_SCIM_API_KEY` | Looks up, provisions, invites, and reactivates team users. | `doctor` can read `GET /scim/v2/Users`. |
 
-The Postman API key belongs to a Postman identity. That identity must be authorized to manage user roles in the target workspace. The doctor command is the supported permission test; do not validate permissions by attempting an unreviewed production write.
+The service account must be assigned to the team that owns the workspace and must have the workspace `Admin` role. The installed workflows exchange its PMAK for a fresh short-lived access token on every run. The doctor command verifies read access; the protected sandbox smoke test is the supported write-permission test.
 
-Never place either key in repository variables, workflow YAML, scanner JSON, artifacts, command history, or logs. Use GitHub Actions secrets or an equivalent CI secret manager.
+Never place either long-lived key or the minted access token in repository variables, workflow YAML, scanner JSON, artifacts, command history, or logs. Use GitHub Actions secrets or an equivalent CI secret manager for the long-lived keys and mint the access token at runtime.
 
 ## Workspace requirements
 
 - Use a team workspace, not a personal workspace. Postman does not support role assignment on personal workspaces.
+- Assign the system service account to the owning team and to the target workspace as `Admin`.
 - Confirm the workspace exposes every role requested by the configured map. The defaults are `Admin`, `Editor`, and `Viewer`.
 - The API limits workspace role updates to 50 operations per request; the action batches automatically at that limit.
 - The action identifies users by SCIM ID and sends `identifierType: scim` on role updates.

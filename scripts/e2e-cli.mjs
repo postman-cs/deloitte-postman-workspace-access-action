@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import {
   POSTMAN_KEY,
+  POSTMAN_ACCESS_TOKEN,
   SCIM_KEY,
   NOTIFICATION_TOKEN,
   assertSecretsMasked,
@@ -37,6 +38,7 @@ function runCli(baseUrl, workspaceId, members, options = {}) {
   return runProcess(process.execPath, args, {
     env: {
       POSTMAN_API_KEY: options.postmanKey ?? POSTMAN_KEY,
+      POSTMAN_ACCESS_TOKEN: POSTMAN_ACCESS_TOKEN,
       POSTMAN_SCIM_API_KEY: options.scimKey === null ? '' : options.scimKey ?? SCIM_KEY,
       GITHUB_REPOSITORY: 'deloitte/arbiter',
       GITHUB_RUN_ID: '424242',

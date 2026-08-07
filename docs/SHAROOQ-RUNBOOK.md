@@ -13,6 +13,8 @@ Add these GitHub Actions secrets to the Deloitte pipeline repository:
 
 The installer creates a local action, reusable and scheduled workflows, a central `.deloitte-postman.yml`, a notification template/adapter, and a doctor command. Do not store credentials in a repository variable, scanner artifact, or log.
 
+The installed workflows use `POSTMAN_API_KEY` only to mint a fresh service-account access token, then pass that token to the local action. The service account must be assigned to the team that owns the workspace and to the workspace itself as `Admin`.
+
 Edit `.deloitte-postman.yml` to match Deloitte's scanner and onboarding links. The installer preserves this file during upgrades. Use `scanner.identityMapFile` for a JSON object or `login,email` CSV when GitHub records do not include corporate email. Keep `scanner.invalidMemberPolicy: continue` to onboard valid people while reporting exceptions; use `fail` only for an all-or-nothing gate.
 
 Before credentials are available, validate the scanner artifact without network access:
@@ -30,6 +32,7 @@ From the consumer repository:
 
 ```bash
 export POSTMAN_API_KEY
+export POSTMAN_ACCESS_TOKEN
 export POSTMAN_SCIM_API_KEY
 
 ./scripts/deloitte-postman-doctor.sh \
@@ -37,7 +40,7 @@ export POSTMAN_SCIM_API_KEY
   --scanner-search-root artifacts
 ```
 
-Doctor mode checks the workspace, both credentials, scanner contract, user lookups, and role mapping. It sends only `GET` requests and never invites users or changes workspace access.
+Doctor mode checks the workspace, API and SCIM credentials, scanner contract, user lookups, and role mapping. It sends only `GET` requests and never invites users or changes workspace access. When `POSTMAN_API_KEY` belongs to a system service account, `POSTMAN_ACCESS_TOKEN` must contain a freshly minted token.
 
 Recognized scanner filenames are:
 

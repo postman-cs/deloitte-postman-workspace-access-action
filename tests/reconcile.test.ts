@@ -49,6 +49,7 @@ describe('workspace access reconciliation', () => {
     });
     const client = new PostmanClient({
       postmanApiKey: 'pmak-test',
+      postmanAccessToken: 'access-test',
       scimApiKey: 'scim-test',
       fetcher
     });
@@ -61,7 +62,11 @@ describe('workspace access reconciliation', () => {
 
     expect(summary.counts).toEqual({ added: 1, invited: 0, pending: 0, skipped: 0, failed: 0 });
     const patch = calls.find((call) => call.url.endsWith('/workspaces/ws-1/roles'));
-    expect(patch?.init?.headers).toMatchObject({ identifierType: 'scim' });
+    expect(patch?.init?.headers).toMatchObject({
+      Authorization: 'Bearer access-test',
+      'x-api-key': 'pmak-test',
+      identifierType: 'scim'
+    });
     expect(JSON.parse(String(patch?.init?.body))).toEqual({
       roles: [{ op: 'add', path: '/user', value: [{ id: 'scim-1', role: '2' }] }]
     });

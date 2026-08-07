@@ -57,6 +57,7 @@ Reconciliation options:
 
 Environment:
   POSTMAN_API_KEY
+  POSTMAN_ACCESS_TOKEN
   POSTMAN_SCIM_API_KEY
   DELOITTE_NOTIFICATION_WEBHOOK_URL
   DELOITTE_NOTIFICATION_WEBHOOK_TOKEN
@@ -252,11 +253,13 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
   if (!workspaceId) throw new Error('--workspace-id is required.');
   const postmanApiKey = process.env.POSTMAN_API_KEY?.trim();
   if (!postmanApiKey) throw new Error('POSTMAN_API_KEY is required.');
+  const postmanAccessToken = process.env.POSTMAN_ACCESS_TOKEN?.trim();
   const workspaceUrl = values['postman-workspace-url'] ?? config.postmanWorkspaceUrl;
   const notificationSubject = values['notification-subject'] ?? config.notification?.subject;
   const notificationWebhookUrl = process.env.DELOITTE_NOTIFICATION_WEBHOOK_URL?.trim();
   const client = new PostmanClient({
     postmanApiKey,
+    ...(postmanAccessToken ? { postmanAccessToken } : {}),
     ...(process.env.POSTMAN_SCIM_API_KEY?.trim()
       ? { scimApiKey: process.env.POSTMAN_SCIM_API_KEY.trim() }
       : {}),

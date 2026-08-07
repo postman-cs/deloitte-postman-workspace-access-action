@@ -44,6 +44,14 @@ describe('Sharooq starter-kit contract', () => {
     expect(workflow.jobs.reconcile.steps.some(
       (step) => step.uses === 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c'
     )).toBe(true);
+    const token = workflow.jobs.reconcile.steps.find(
+      (step) => step.uses === 'postman-cs/postman-resolve-service-token-action@71bb640cde9e070238b90ab80801c91ce73e0564'
+    );
+    expect(token?.with?.['postman-api-key']).toBe('${{ secrets.POSTMAN_API_KEY }}');
+    const action = workflow.jobs.reconcile.steps.find(
+      (step) => step.uses === './.github/actions/deloitte-postman-workspace-access'
+    );
+    expect(action?.with?.['postman-access-token']).toBe('${{ steps.postman_token.outputs.token }}');
   });
 
   it('renders and routes Deloitte onboarding notifications', () => {
@@ -62,6 +70,8 @@ describe('Sharooq starter-kit contract', () => {
     expect(pending).toContain('schedule:');
     expect(pending).toContain("DELOITTE_PENDING_RECONCILIATION_ENABLED == 'true'");
     expect(pending).toContain('Download latest successful scanner artifact');
+    expect(pending).toContain('postman-resolve-service-token-action@71bb640cde9e070238b90ab80801c91ce73e0564');
+    expect(pending).toContain('postman-access-token: ${{ steps.postman_token.outputs.token }}');
     expect(pending).not.toContain('notification-webhook-url');
     expect(readFileSync('templates/logic-app/deloitte-postman-notifier.workflow.json', 'utf8'))
       .toContain('Deloitte_Postman_notification_batch');

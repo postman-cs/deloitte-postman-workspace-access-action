@@ -6,7 +6,7 @@ The `Postman sandbox smoke test` workflow is the final tenant-level validation. 
 
 Create a dedicated, non-production Postman workspace and configure these environment secrets:
 
-- `POSTMAN_SANDBOX_API_KEY`
+- `POSTMAN_SANDBOX_API_KEY` — a system service-account PMAK; the workflow mints a fresh access token.
 - `POSTMAN_SANDBOX_SCIM_API_KEY`
 
 Choose two approved identities:

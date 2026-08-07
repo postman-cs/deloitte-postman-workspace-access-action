@@ -7815,16 +7815,25 @@ function responseDelay(response, attempt) {
 var PostmanClient = class {
   hasScimKey;
   postmanApiKey;
+  postmanAccessToken;
   scimApiKey;
   baseUrl;
   fetcher;
   constructor(options) {
     this.postmanApiKey = options.postmanApiKey.trim();
+    this.postmanAccessToken = options.postmanAccessToken?.trim() || void 0;
     this.scimApiKey = options.scimApiKey?.trim() || void 0;
     this.hasScimKey = Boolean(this.scimApiKey);
     this.baseUrl = (options.baseUrl?.trim() || "https://api.postman.com").replace(/\/+$/, "");
     this.fetcher = options.fetcher ?? fetch;
     if (!this.postmanApiKey) throw new Error("postman-api-key is required.");
+  }
+  postmanHeaders(additional = {}) {
+    return {
+      "x-api-key": this.postmanApiKey,
+      ...this.postmanAccessToken ? { Authorization: `Bearer ${this.postmanAccessToken}` } : {},
+      ...additional
+    };
   }
   async requestJson(path, init, expectedStatuses) {
     let lastResponse;
@@ -7848,7 +7857,7 @@ var PostmanClient = class {
   async getWorkspaceRoles() {
     const payload = await this.requestJson("/workspace-roles", {
       method: "GET",
-      headers: { "x-api-key": this.postmanApiKey }
+      headers: this.postmanHeaders()
     }, [200]);
     const roles = Array.isArray(payload.roles) ? payload.roles : [];
     return roles.flatMap((value) => {
@@ -7861,7 +7870,7 @@ var PostmanClient = class {
   async getWorkspace(workspaceId) {
     const payload = await this.requestJson(`/workspaces/${encodeURIComponent(workspaceId)}`, {
       method: "GET",
-      headers: { "x-api-key": this.postmanApiKey }
+      headers: this.postmanHeaders()
     }, [200]);
     const workspace = asRecord(payload.workspace);
     const id = typeof workspace.id === "string" || typeof workspace.id === "number" ? String(workspace.id).trim() : "";
@@ -7973,11 +7982,10 @@ var PostmanClient = class {
     if (assignments.length === 0) return;
     await this.requestJson(`/workspaces/${encodeURIComponent(workspaceId)}/roles`, {
       method: "PATCH",
-      headers: {
-        "x-api-key": this.postmanApiKey,
+      headers: this.postmanHeaders({
         "content-type": "application/json-patch+json",
         identifierType: "scim"
-      },
+      }),
       body: JSON.stringify({
         roles: [{
           op: "add",
@@ -8151,7 +8159,7 @@ async function diagnoseWorkspaceAccess(client, options, reporter) {
       {
         name: "workspace-access",
         status: "passed",
-        message: `POSTMAN_API_KEY can read workspace ${workspace.name ?? workspace.id}.`
+        message: `Postman API credentials can read workspace ${workspace.name ?? workspace.id}.`
       },
       {
         name: "scim-access",
@@ -8621,6 +8629,7 @@ Reconciliation options:
 
 Environment:
   POSTMAN_API_KEY
+  POSTMAN_ACCESS_TOKEN
   POSTMAN_SCIM_API_KEY
   DELOITTE_NOTIFICATION_WEBHOOK_URL
   DELOITTE_NOTIFICATION_WEBHOOK_TOKEN
@@ -8808,11 +8817,13 @@ async function runCli(argv = process.argv.slice(2)) {
   if (!workspaceId) throw new Error("--workspace-id is required.");
   const postmanApiKey = process.env.POSTMAN_API_KEY?.trim();
   if (!postmanApiKey) throw new Error("POSTMAN_API_KEY is required.");
+  const postmanAccessToken = process.env.POSTMAN_ACCESS_TOKEN?.trim();
   const workspaceUrl = values["postman-workspace-url"] ?? config.postmanWorkspaceUrl;
   const notificationSubject = values["notification-subject"] ?? config.notification?.subject;
   const notificationWebhookUrl = process.env.DELOITTE_NOTIFICATION_WEBHOOK_URL?.trim();
   const client = new PostmanClient({
     postmanApiKey,
+    ...postmanAccessToken ? { postmanAccessToken } : {},
     ...process.env.POSTMAN_SCIM_API_KEY?.trim() ? { scimApiKey: process.env.POSTMAN_SCIM_API_KEY.trim() } : {},
     ...values["postman-base-url"] ? { baseUrl: values["postman-base-url"] } : {}
   });
