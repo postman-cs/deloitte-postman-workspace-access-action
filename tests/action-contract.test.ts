@@ -21,6 +21,7 @@ describe('GitHub Action contract', () => {
   it('requires the target workspace and Postman API key', () => {
     expect(action.inputs?.['workspace-id']?.required).toBe(true);
     expect(action.inputs?.['postman-api-key']?.required).toBe(true);
+    expect(action.inputs?.['postman-access-token']?.required).toBe(false);
     expect(action.inputs?.['postman-scim-api-key']?.required).toBe(false);
   });
 

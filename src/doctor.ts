@@ -33,7 +33,7 @@ export async function diagnoseWorkspaceAccess(
       {
         name: 'workspace-access',
         status: 'passed',
-        message: `POSTMAN_API_KEY can read workspace ${workspace.name ?? workspace.id}.`
+        message: `Postman API credentials can read workspace ${workspace.name ?? workspace.id}.`
       },
       {
         name: 'scim-access',

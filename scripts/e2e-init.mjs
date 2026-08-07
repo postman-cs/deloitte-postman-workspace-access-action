@@ -6,6 +6,7 @@ import { parse } from 'yaml';
 
 import {
   POSTMAN_KEY,
+  POSTMAN_ACCESS_TOKEN,
   SCIM_KEY,
   assertSecretsMasked,
   runProcess,
@@ -76,7 +77,11 @@ try {
       '--postman-base-url', `${simulator.baseUrl}/init`
     ], {
       cwd: consumer,
-      env: { POSTMAN_API_KEY: POSTMAN_KEY, POSTMAN_SCIM_API_KEY: SCIM_KEY }
+      env: {
+        POSTMAN_API_KEY: POSTMAN_KEY,
+        POSTMAN_ACCESS_TOKEN,
+        POSTMAN_SCIM_API_KEY: SCIM_KEY
+      }
     });
     assert.equal(doctor.code, 0, doctor.stderr);
     assertSecretsMasked(doctor);

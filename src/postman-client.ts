@@ -21,6 +21,7 @@ export class HttpError extends Error {
 
 export interface PostmanClientOptions {
   postmanApiKey: string;
+  postmanAccessToken?: string;
   scimApiKey?: string;
   baseUrl?: string;
   fetcher?: FetchLike;
@@ -54,17 +55,29 @@ function responseDelay(response: Response, attempt: number): number {
 export class PostmanClient {
   readonly hasScimKey: boolean;
   private readonly postmanApiKey: string;
+  private readonly postmanAccessToken: string | undefined;
   private readonly scimApiKey: string | undefined;
   private readonly baseUrl: string;
   private readonly fetcher: FetchLike;
 
   constructor(options: PostmanClientOptions) {
     this.postmanApiKey = options.postmanApiKey.trim();
+    this.postmanAccessToken = options.postmanAccessToken?.trim() || undefined;
     this.scimApiKey = options.scimApiKey?.trim() || undefined;
     this.hasScimKey = Boolean(this.scimApiKey);
     this.baseUrl = (options.baseUrl?.trim() || 'https://api.postman.com').replace(/\/+$/, '');
     this.fetcher = options.fetcher ?? fetch;
     if (!this.postmanApiKey) throw new Error('postman-api-key is required.');
+  }
+
+  private postmanHeaders(additional: Record<string, string> = {}): Record<string, string> {
+    return {
+      'x-api-key': this.postmanApiKey,
+      ...(this.postmanAccessToken
+        ? { Authorization: `Bearer ${this.postmanAccessToken}` }
+        : {}),
+      ...additional
+    };
   }
 
   private async requestJson(
@@ -94,7 +107,7 @@ export class PostmanClient {
   async getWorkspaceRoles(): Promise<WorkspaceRole[]> {
     const payload = await this.requestJson('/workspace-roles', {
       method: 'GET',
-      headers: { 'x-api-key': this.postmanApiKey }
+      headers: this.postmanHeaders()
     }, [200]);
     const roles = Array.isArray(payload.roles) ? payload.roles : [];
     return roles.flatMap((value) => {
@@ -108,7 +121,7 @@ export class PostmanClient {
   async getWorkspace(workspaceId: string): Promise<WorkspaceIdentity> {
     const payload = await this.requestJson(`/workspaces/${encodeURIComponent(workspaceId)}`, {
       method: 'GET',
-      headers: { 'x-api-key': this.postmanApiKey }
+      headers: this.postmanHeaders()
     }, [200]);
     const workspace = asRecord(payload.workspace);
     const id = typeof workspace.id === 'string' || typeof workspace.id === 'number'
@@ -234,11 +247,10 @@ export class PostmanClient {
     if (assignments.length === 0) return;
     await this.requestJson(`/workspaces/${encodeURIComponent(workspaceId)}/roles`, {
       method: 'PATCH',
-      headers: {
-        'x-api-key': this.postmanApiKey,
+      headers: this.postmanHeaders({
         'content-type': 'application/json-patch+json',
         identifierType: 'scim'
-      },
+      }),
       body: JSON.stringify({
         roles: [{
           op: 'add',

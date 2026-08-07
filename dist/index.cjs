@@ -27330,16 +27330,25 @@ function responseDelay(response, attempt) {
 var PostmanClient = class {
   hasScimKey;
   postmanApiKey;
+  postmanAccessToken;
   scimApiKey;
   baseUrl;
   fetcher;
   constructor(options) {
     this.postmanApiKey = options.postmanApiKey.trim();
+    this.postmanAccessToken = options.postmanAccessToken?.trim() || void 0;
     this.scimApiKey = options.scimApiKey?.trim() || void 0;
     this.hasScimKey = Boolean(this.scimApiKey);
     this.baseUrl = (options.baseUrl?.trim() || "https://api.postman.com").replace(/\/+$/, "");
     this.fetcher = options.fetcher ?? fetch;
     if (!this.postmanApiKey) throw new Error("postman-api-key is required.");
+  }
+  postmanHeaders(additional = {}) {
+    return {
+      "x-api-key": this.postmanApiKey,
+      ...this.postmanAccessToken ? { Authorization: `Bearer ${this.postmanAccessToken}` } : {},
+      ...additional
+    };
   }
   async requestJson(path, init, expectedStatuses) {
     let lastResponse;
@@ -27363,7 +27372,7 @@ var PostmanClient = class {
   async getWorkspaceRoles() {
     const payload = await this.requestJson("/workspace-roles", {
       method: "GET",
-      headers: { "x-api-key": this.postmanApiKey }
+      headers: this.postmanHeaders()
     }, [200]);
     const roles = Array.isArray(payload.roles) ? payload.roles : [];
     return roles.flatMap((value) => {
@@ -27376,7 +27385,7 @@ var PostmanClient = class {
   async getWorkspace(workspaceId) {
     const payload = await this.requestJson(`/workspaces/${encodeURIComponent(workspaceId)}`, {
       method: "GET",
-      headers: { "x-api-key": this.postmanApiKey }
+      headers: this.postmanHeaders()
     }, [200]);
     const workspace = asRecord(payload.workspace);
     const id = typeof workspace.id === "string" || typeof workspace.id === "number" ? String(workspace.id).trim() : "";
@@ -27488,11 +27497,10 @@ var PostmanClient = class {
     if (assignments.length === 0) return;
     await this.requestJson(`/workspaces/${encodeURIComponent(workspaceId)}/roles`, {
       method: "PATCH",
-      headers: {
-        "x-api-key": this.postmanApiKey,
+      headers: this.postmanHeaders({
         "content-type": "application/json-patch+json",
         identifierType: "scim"
-      },
+      }),
       body: JSON.stringify({
         roles: [{
           op: "add",
@@ -27783,6 +27791,7 @@ async function runAction() {
   try {
     const workspaceId = getInput("workspace-id", { required: true }).trim();
     const postmanApiKey = getInput("postman-api-key", { required: true }).trim();
+    const postmanAccessToken = optionalInput("postman-access-token");
     const scimApiKey = optionalInput("postman-scim-api-key");
     const notificationWebhookUrl = optionalInput("notification-webhook-url");
     const notificationWebhookToken = optionalInput("notification-webhook-token");
@@ -27792,6 +27801,7 @@ async function runAction() {
     const workspaceUrl = optionalInput("postman-workspace-url") ?? config.postmanWorkspaceUrl;
     const notificationSubject = optionalInput("notification-subject") ?? config.notification?.subject;
     setSecret(postmanApiKey);
+    if (postmanAccessToken) setSecret(postmanAccessToken);
     if (scimApiKey) setSecret(scimApiKey);
     if (notificationWebhookUrl) setSecret(notificationWebhookUrl);
     if (notificationWebhookToken) setSecret(notificationWebhookToken);
@@ -27833,6 +27843,7 @@ async function runAction() {
     const baseUrl = optionalInput("postman-base-url");
     const client = new PostmanClient({
       postmanApiKey,
+      ...postmanAccessToken ? { postmanAccessToken } : {},
       ...scimApiKey ? { scimApiKey } : {},
       ...baseUrl ? { baseUrl } : {}
     });

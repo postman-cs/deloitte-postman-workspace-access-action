@@ -80,6 +80,12 @@ jobs:
           ] }, null, 2)}\n`, { mode: 0o600 });
           NODE
 
+      - name: Mint Postman service-account token
+        id: postman_token
+        uses: postman-cs/postman-resolve-service-token-action@71bb640cde9e070238b90ab80801c91ce73e0564 # v2.1.1
+        with:
+          postman-api-key: ${{ secrets.POSTMAN_SANDBOX_API_KEY }}
+
       - name: Preview sandbox changes
         id: preview
         uses: ./
@@ -87,6 +93,7 @@ jobs:
           workspace-id: ${{ inputs.workspace_id }}
           members-file: .postman-sandbox-smoke/scanner-output.json
           postman-api-key: ${{ secrets.POSTMAN_SANDBOX_API_KEY }}
+          postman-access-token: ${{ steps.postman_token.outputs.token }}
           postman-scim-api-key: ${{ secrets.POSTMAN_SANDBOX_SCIM_API_KEY }}
           dry-run: 'true'
           summary-file: .postman-sandbox-smoke/preview-summary.json
@@ -99,6 +106,7 @@ jobs:
           workspace-id: ${{ inputs.workspace_id }}
           members-file: .postman-sandbox-smoke/scanner-output.json
           postman-api-key: ${{ secrets.POSTMAN_SANDBOX_API_KEY }}
+          postman-access-token: ${{ steps.postman_token.outputs.token }}
           postman-scim-api-key: ${{ secrets.POSTMAN_SANDBOX_SCIM_API_KEY }}
           dry-run: 'false'
           fail-on-pending-invites: 'false'

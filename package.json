@@ -1,6 +1,6 @@
 {
   "name": "@postman-cse/deloitte-workspace-access",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Onboard every detected GitHub collaborator into Postman and render Deloitte usage notifications.",
   "type": "module",
   "main": "dist/index.cjs",

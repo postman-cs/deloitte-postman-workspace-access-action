@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import {
   POSTMAN_KEY,
+  POSTMAN_ACCESS_TOKEN,
   SCIM_KEY,
   assertSecretsMasked,
   runProcess,
@@ -66,7 +67,11 @@ try {
       '--members-json', JSON.stringify([{ email: 'package.current@example.com', permission: 'admin' }]),
       '--postman-base-url', `${simulator.baseUrl}/package`
     ], {
-      env: { POSTMAN_API_KEY: POSTMAN_KEY, POSTMAN_SCIM_API_KEY: SCIM_KEY }
+      env: {
+        POSTMAN_API_KEY: POSTMAN_KEY,
+        POSTMAN_ACCESS_TOKEN,
+        POSTMAN_SCIM_API_KEY: SCIM_KEY
+      }
     });
     assert.equal(result.code, 0, result.stderr);
     assertSecretsMasked(result);

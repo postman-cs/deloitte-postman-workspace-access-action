@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import {
   POSTMAN_KEY,
+  POSTMAN_ACCESS_TOKEN,
   SCIM_KEY,
   NOTIFICATION_TOKEN,
   assertSecretsMasked,
@@ -45,6 +46,7 @@ async function runAction(entrypoint, directory, baseUrl, workspaceId, members, o
       'INPUT_ROLE-MAP-JSON': options.roleMap ? JSON.stringify(options.roleMap) : '',
       'INPUT_DEFAULT-WORKSPACE-ROLE': options.defaultWorkspaceRole ?? '',
       'INPUT_POSTMAN-API-KEY': POSTMAN_KEY,
+      'INPUT_POSTMAN-ACCESS-TOKEN': POSTMAN_ACCESS_TOKEN,
       'INPUT_POSTMAN-SCIM-API-KEY': SCIM_KEY,
       'INPUT_DRY-RUN': options.dryRun ? 'true' : 'false',
       'INPUT_FAIL-ON-PENDING-INVITES': options.failOnPending ? 'true' : 'false',

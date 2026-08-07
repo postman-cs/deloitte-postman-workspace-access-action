@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const POSTMAN_KEY = 'qa-postman-key-never-log';
+export const POSTMAN_ACCESS_TOKEN = 'qa-postman-access-token-never-log';
 export const SCIM_KEY = 'qa-scim-key-never-log';
 export const NOTIFICATION_TOKEN = 'qa-notification-token-never-log';
 
@@ -68,6 +69,7 @@ export async function startSimulator() {
       query: url.searchParams.toString(),
       body: parsedBody,
       postmanKey: request.headers['x-api-key'],
+      authorization: request.headers.authorization,
       scimKey: request.headers.authorization,
       identifierType: request.headers.identifiertype,
       contentType: request.headers['content-type'],
@@ -91,6 +93,7 @@ export async function startSimulator() {
     if (request.method === 'GET' && apiPath === '/workspace-roles') {
       state.roleCatalogAttempts += 1;
       assert.equal(entry.postmanKey, POSTMAN_KEY);
+      assert.equal(entry.authorization, `Bearer ${POSTMAN_ACCESS_TOKEN}`);
       if (scenario === 'retry' && state.roleCatalogAttempts === 1) {
         return sendJson(response, 429, { error: 'rate limited once' }, { 'retry-after': '0' });
       }
@@ -103,6 +106,7 @@ export async function startSimulator() {
 
     if (request.method === 'GET' && /^\/workspaces\/[^/]+$/.test(apiPath)) {
       assert.equal(entry.postmanKey, POSTMAN_KEY);
+      assert.equal(entry.authorization, `Bearer ${POSTMAN_ACCESS_TOKEN}`);
       const id = decodeURIComponent(apiPath.slice('/workspaces/'.length));
       return sendJson(response, 200, { workspace: { id, name: 'Deloitte QA Workspace' } });
     }
@@ -142,6 +146,7 @@ export async function startSimulator() {
 
     if (request.method === 'PATCH' && /^\/workspaces\/[^/]+\/roles$/.test(apiPath)) {
       assert.equal(entry.postmanKey, POSTMAN_KEY);
+      assert.equal(entry.authorization, `Bearer ${POSTMAN_ACCESS_TOKEN}`);
       assert.equal(entry.identifierType, 'scim');
       assert.equal(entry.contentType, 'application/json-patch+json');
       const assignments = parsedBody?.roles?.[0]?.value ?? [];
@@ -228,7 +233,7 @@ export function assertSecretsMasked(result, extraText = '') {
     .split('\n')
     .filter((line) => !line.startsWith('::add-mask::'))
     .join('\n');
-  for (const secret of [POSTMAN_KEY, SCIM_KEY, NOTIFICATION_TOKEN]) {
+  for (const secret of [POSTMAN_KEY, POSTMAN_ACCESS_TOKEN, SCIM_KEY, NOTIFICATION_TOKEN]) {
     assert(!nonMaskStdout.includes(secret), `stdout leaked ${secret}`);
     assert(!result.stderr.includes(secret), `stderr leaked ${secret}`);
     assert(!extraText.includes(secret), `output artifact leaked ${secret}`);

@@ -39,8 +39,11 @@ inputs:
     description: Inclusive fallback role assigned to detected collaborators with no explicit or mapped GitHub permission.
     required: false
   postman-api-key:
-    description: Postman API key authorized to manage roles on the target workspace.
+    description: Postman API key authorized for the target workspace. For system service accounts, pass the long-lived PMAK here and a freshly minted token in postman-access-token.
     required: true
+  postman-access-token:
+    description: Optional short-lived Postman system service-account access token used for API requests.
+    required: false
   postman-scim-api-key:
     description: SCIM API key used to look up users and invite/provision users who are not on the team.
     required: false

@@ -1,23 +1,23 @@
 # Build and Verification Log
 
-This file describes the build gates applied to the Deloitte Postman Workspace Access Action. The release candidate documented here is `v0.5.0`.
+This file describes the build gates applied to the Deloitte Postman Workspace Access Action. The release candidate documented here is `v0.6.0`.
 
-## v0.5.0 scope
+## v0.6.0 scope
 
-- A central, upgrade-safe `.deloitte-postman.yml` controls scanner, identity, role, and notification policy.
-- Valid contributors continue onboarding when another scanner record is unresolved; missing identities and explicit exclusions remain counted and auditable.
-- GitHub login-to-email identity maps, bot exclusions, adoption links, recipient-domain allowlists, and compact metrics are supported.
-- The installer adds a scheduled pending-invite reconciliation workflow and Microsoft Logic Apps/Office 365 email adapter.
-- The CLI adds `init`, `upgrade`, config validation, and a guarded one-recipient notification test.
+- The GitHub Action and CI-neutral CLI accept a freshly minted Postman system service-account access token while preserving regular user API-key compatibility.
+- Postman API requests send the short-lived token as a bearer credential together with the long-lived PMAK; SCIM continues to use its independent key.
+- Installed reconciliation and pending-invite workflows mint a fresh token on every run with the pinned `postman-resolve-service-token-action` release.
+- Prerequisites and runbooks require the service account to belong to the owning team and hold `Admin` on the target workspace.
+- End-to-end coverage verifies bearer authentication, secret masking, vendored execution, installation, packaging, and release assets.
 
-## Local release-candidate verification — 2026-08-04
+## Local release-candidate verification — 2026-08-07
 
 - 47 unit and contract tests passed across 10 test files.
-- CLI E2E passed lifecycle, partial scanner recovery, identity mapping, bot exclusion, notification delivery, discovery, retry, doctor, validation, and exit-code paths.
-- GitHub Action E2E passed scanner metrics, partial-record continuation, successful delivery, pending-invite messaging, dry-run suppression, rejected-gateway failure, outputs, summaries, and vendored execution.
-- Installer and upgrade E2E passed config preservation, scheduled workflow/Logic App installation, packaged CLI, npm artifact, starter-kit archive, SBOM, manifest, checksums, and overwrite protection.
+- CLI E2E passed bearer-token authentication, lifecycle, partial scanner recovery, identity mapping, notification delivery, discovery, retry, doctor, validation, and exit-code paths.
+- GitHub Action E2E passed bearer-token authentication and masking, scanner metrics, delivery, pending-invite messaging, dry-run suppression, outputs, summaries, and vendored execution.
+- Installer, package, release, and vendor E2E passed config preservation, token-aware workflows, packaged CLI, npm artifact, starter-kit archive, SBOM, manifest, checksums, and overwrite protection.
 - TypeScript compilation and deterministic Node 24 bundles passed.
-- Production dependency audit reported zero vulnerabilities.
+- The npm package dry run completed with the expected `v0.6.0` contents.
 
 ## Required release gates
 
@@ -49,7 +49,7 @@ Verify a downloaded release with:
 ```bash
 shasum -a 256 -c SHA256SUMS
 gh attestation verify \
-  deloitte-postman-workspace-access-starter-kit-v0.5.0.tar.gz \
+  deloitte-postman-workspace-access-starter-kit-v0.6.0.tar.gz \
   --repo postman-cs/deloitte-postman-workspace-access-action
 ```
 
