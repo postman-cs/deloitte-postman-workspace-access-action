@@ -84,7 +84,7 @@ jobs:
 
       - name: Mint Postman service-account token
         id: postman_token
-        uses: postman-cs/postman-resolve-service-token-action@71bb640cde9e070238b90ab80801c91ce73e0564 # v2.1.1
+        uses: postman-cs/postman-resolve-service-token-action@bea2e7cdeb7b7db37712aed65859368d30ca74f4 # v2.2.6
         with:
           postman-api-key: ${{ secrets.POSTMAN_SANDBOX_API_KEY }}
 
